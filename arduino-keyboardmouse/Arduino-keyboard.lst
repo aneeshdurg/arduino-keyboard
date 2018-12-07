@@ -1,0 +1,2233 @@
+   1               		.file	"Arduino-keyboard.c"
+   2               	__SP_H__ = 0x3e
+   3               	__SP_L__ = 0x3d
+   4               	__SREG__ = 0x3f
+   5               	__tmp_reg__ = 0
+   6               	__zero_reg__ = 1
+   7               		.text
+   8               	.Ltext0:
+   9               		.cfi_sections	.debug_frame
+  10               		.section	.text.SetupHardware,"ax",@progbits
+  11               	.global	SetupHardware
+  13               	SetupHardware:
+  14               	.LFB91:
+  15               		.file 1 "Arduino-keyboard.c"
+   1:Arduino-keyboard.c **** /*
+   2:Arduino-keyboard.c ****              LUFA Library
+   3:Arduino-keyboard.c ****      Copyright (C) Dean Camera, 2010.
+   4:Arduino-keyboard.c ****               
+   5:Arduino-keyboard.c ****   dean [at] fourwalledcubicle [dot] com
+   6:Arduino-keyboard.c ****       www.fourwalledcubicle.com
+   7:Arduino-keyboard.c **** */
+   8:Arduino-keyboard.c **** 
+   9:Arduino-keyboard.c **** /*
+  10:Arduino-keyboard.c ****   Copyright 2010  Dean Camera (dean [at] fourwalledcubicle [dot] com)
+  11:Arduino-keyboard.c **** 
+  12:Arduino-keyboard.c ****   Permission to use, copy, modify, distribute, and sell this 
+  13:Arduino-keyboard.c ****   software and its documentation for any purpose is hereby granted
+  14:Arduino-keyboard.c ****   without fee, provided that the above copyright notice appear in 
+  15:Arduino-keyboard.c ****   all copies and that both that the copyright notice and this
+  16:Arduino-keyboard.c ****   permission notice and warranty disclaimer appear in supporting 
+  17:Arduino-keyboard.c ****   documentation, and that the name of the author not be used in 
+  18:Arduino-keyboard.c ****   advertising or publicity pertaining to distribution of the 
+  19:Arduino-keyboard.c ****   software without specific, written prior permission.
+  20:Arduino-keyboard.c **** 
+  21:Arduino-keyboard.c ****   The author disclaim all warranties with regard to this
+  22:Arduino-keyboard.c ****   software, including all implied warranties of merchantability
+  23:Arduino-keyboard.c ****   and fitness.  In no event shall the author be liable for any
+  24:Arduino-keyboard.c ****   special, indirect or consequential damages or any damages
+  25:Arduino-keyboard.c ****   whatsoever resulting from loss of use, data or profits, whether
+  26:Arduino-keyboard.c ****   in an action of contract, negligence or other tortious action,
+  27:Arduino-keyboard.c ****   arising out of or in connection with the use or performance of
+  28:Arduino-keyboard.c ****   this software.
+  29:Arduino-keyboard.c **** */
+  30:Arduino-keyboard.c **** 
+  31:Arduino-keyboard.c **** /*-
+  32:Arduino-keyboard.c ****  * Copyright (c) 2011 Darran Hunt (darran [at] hunt dot net dot nz)
+  33:Arduino-keyboard.c ****  * All rights reserved.
+  34:Arduino-keyboard.c ****  *
+  35:Arduino-keyboard.c ****  * Redistribution and use in source and binary forms, with or without
+  36:Arduino-keyboard.c ****  * modification, are permitted provided that the following conditions
+  37:Arduino-keyboard.c ****  * are met:
+  38:Arduino-keyboard.c ****  * 1. Redistributions of source code must retain the above copyright
+  39:Arduino-keyboard.c ****  *    notice, this list of conditions and the following disclaimer.
+  40:Arduino-keyboard.c ****  * 2. Redistributions in binary form must reproduce the above copyright
+  41:Arduino-keyboard.c ****  *    notice, this list of conditions and the following disclaimer in the
+  42:Arduino-keyboard.c ****  *    documentation and/or other materials provided with the distribution.
+  43:Arduino-keyboard.c ****  *
+  44:Arduino-keyboard.c ****  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
+  45:Arduino-keyboard.c ****  * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+  46:Arduino-keyboard.c ****  * AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL
+  47:Arduino-keyboard.c ****  * THE CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+  48:Arduino-keyboard.c ****  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+  49:Arduino-keyboard.c ****  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+  50:Arduino-keyboard.c ****  * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+  51:Arduino-keyboard.c ****  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+  52:Arduino-keyboard.c ****  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+  53:Arduino-keyboard.c ****  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  54:Arduino-keyboard.c ****  */
+  55:Arduino-keyboard.c **** 
+  56:Arduino-keyboard.c **** /*
+  57:Arduino-keyboard.c ****  * Date         Rev  Description
+  58:Arduino-keyboard.c ****  * 21-Mar-2011  0.1  Initial version.
+  59:Arduino-keyboard.c ****  * 23-Mar-2011  0.2  Improved handling of serial reports to ensure that all reports
+  60:Arduino-keyboard.c ****  *                   will be sent.
+  61:Arduino-keyboard.c ****  * 13-Apr-2011  0.3  Extended range of keys from 101 to 231.
+  62:Arduino-keyboard.c ****  */
+  63:Arduino-keyboard.c **** 
+  64:Arduino-keyboard.c **** /** \file
+  65:Arduino-keyboard.c ****  *
+  66:Arduino-keyboard.c ****  *  Main source file for the Arduino-keyboard project. This file contains the main tasks of
+  67:Arduino-keyboard.c ****  *  the project and is responsible for the initial application hardware configuration.
+  68:Arduino-keyboard.c ****  */
+  69:Arduino-keyboard.c **** 
+  70:Arduino-keyboard.c **** #include "Arduino-keyboard.h"
+  71:Arduino-keyboard.c **** 
+  72:Arduino-keyboard.c **** /** Buffer to hold the previously generated Keyboard HID report, for comparison purposes inside the
+  73:Arduino-keyboard.c **** uint8_t PrevKeyboardHIDReportBuffer[sizeof(USB_KeyboardReport_Data_t)];
+  74:Arduino-keyboard.c **** 
+  75:Arduino-keyboard.c **** /** LUFA HID Class driver interface configuration and state information. This structure is
+  76:Arduino-keyboard.c ****  *  passed to all HID Class driver functions, so that multiple instances of the same class
+  77:Arduino-keyboard.c ****  *  within a device can be differentiated from one another.
+  78:Arduino-keyboard.c ****  */
+  79:Arduino-keyboard.c **** USB_ClassInfo_HID_Device_t Keyboard_HID_Interface =
+  80:Arduino-keyboard.c ****  	{
+  81:Arduino-keyboard.c **** 		.Config =
+  82:Arduino-keyboard.c **** 			{
+  83:Arduino-keyboard.c **** 				.InterfaceNumber              = 0,
+  84:Arduino-keyboard.c **** 
+  85:Arduino-keyboard.c **** 				.ReportINEndpointNumber       = KEYBOARD_EPNUM,
+  86:Arduino-keyboard.c **** 				.ReportINEndpointSize         = KEYBOARD_EPSIZE,
+  87:Arduino-keyboard.c **** 				.ReportINEndpointDoubleBank   = false,
+  88:Arduino-keyboard.c **** 
+  89:Arduino-keyboard.c **** 				.PrevReportINBuffer           = PrevKeyboardHIDReportBuffer,
+  90:Arduino-keyboard.c **** 				.PrevReportINBufferSize       = sizeof(PrevKeyboardHIDReportBuffer),
+  91:Arduino-keyboard.c **** 			},
+  92:Arduino-keyboard.c ****     };
+  93:Arduino-keyboard.c **** 
+  94:Arduino-keyboard.c **** /** Main program entry point. This routine contains the overall program flow, including initial
+  95:Arduino-keyboard.c ****  *  setup of all components and the main program loop.
+  96:Arduino-keyboard.c ****  */
+  97:Arduino-keyboard.c **** 
+  98:Arduino-keyboard.c **** /** Circular buffer to hold data from the serial port before it is sent to the host. */
+  99:Arduino-keyboard.c **** RingBuff_t USARTtoUSB_Buffer;
+ 100:Arduino-keyboard.c **** 
+ 101:Arduino-keyboard.c **** uint8_t keyboardData[8] = { 0 };
+ 102:Arduino-keyboard.c **** uint8_t ledReport = 0;
+ 103:Arduino-keyboard.c **** 
+ 104:Arduino-keyboard.c **** /** Main program entry point. This routine contains the overall program flow, including initial
+ 105:Arduino-keyboard.c ****  *  setup of all components and the main program loop.
+ 106:Arduino-keyboard.c ****  */
+ 107:Arduino-keyboard.c **** int main(void)
+ 108:Arduino-keyboard.c **** {
+ 109:Arduino-keyboard.c **** 	SetupHardware();
+ 110:Arduino-keyboard.c **** 
+ 111:Arduino-keyboard.c **** 	RingBuffer_InitBuffer(&USARTtoUSB_Buffer);
+ 112:Arduino-keyboard.c **** 
+ 113:Arduino-keyboard.c **** 	sei();
+ 114:Arduino-keyboard.c **** 
+ 115:Arduino-keyboard.c **** 	for (;;)
+ 116:Arduino-keyboard.c **** 	{
+ 117:Arduino-keyboard.c **** 		HID_Device_USBTask(&Keyboard_HID_Interface);
+ 118:Arduino-keyboard.c **** 		USB_USBTask();
+ 119:Arduino-keyboard.c **** 	}
+ 120:Arduino-keyboard.c **** }
+ 121:Arduino-keyboard.c **** 
+ 122:Arduino-keyboard.c **** /** Configures the board hardware and chip peripherals for the demo's functionality. */
+ 123:Arduino-keyboard.c **** void SetupHardware(void)
+ 124:Arduino-keyboard.c **** {
+  16               		.loc 1 124 0
+  17               		.cfi_startproc
+  18 0000 AF92      		push r10
+  19               	.LCFI0:
+  20               		.cfi_def_cfa_offset 3
+  21               		.cfi_offset 10, -2
+  22 0002 BF92      		push r11
+  23               	.LCFI1:
+  24               		.cfi_def_cfa_offset 4
+  25               		.cfi_offset 11, -3
+  26 0004 DF92      		push r13
+  27               	.LCFI2:
+  28               		.cfi_def_cfa_offset 5
+  29               		.cfi_offset 13, -4
+  30 0006 EF92      		push r14
+  31               	.LCFI3:
+  32               		.cfi_def_cfa_offset 6
+  33               		.cfi_offset 14, -5
+  34 0008 FF92      		push r15
+  35               	.LCFI4:
+  36               		.cfi_def_cfa_offset 7
+  37               		.cfi_offset 15, -6
+  38 000a 0F93      		push r16
+  39               	.LCFI5:
+  40               		.cfi_def_cfa_offset 8
+  41               		.cfi_offset 16, -7
+  42 000c 1F93      		push r17
+  43               	.LCFI6:
+  44               		.cfi_def_cfa_offset 9
+  45               		.cfi_offset 17, -8
+  46 000e CF93      		push r28
+  47               	.LCFI7:
+  48               		.cfi_def_cfa_offset 10
+  49               		.cfi_offset 28, -9
+  50 0010 DF93      		push r29
+  51               	.LCFI8:
+  52               		.cfi_def_cfa_offset 11
+  53               		.cfi_offset 29, -10
+  54               	/* prologue: function */
+  55               	/* frame size = 0 */
+  56               	/* stack size = 9 */
+  57               	.L__stack_usage = 9
+ 125:Arduino-keyboard.c **** 	/* Disable watchdog if enabled by bootloader/fuses */
+ 126:Arduino-keyboard.c **** 	MCUSR &= ~(1 << WDRF);
+  58               		.loc 1 126 0
+  59 0012 84B7      		in r24,0x34
+  60 0014 877F      		andi r24,lo8(-9)
+  61 0016 84BF      		out 0x34,r24
+  62               	.LBB60:
+  63               	.LBB61:
+  64               		.file 2 "/usr/lib/avr/include/avr/wdt.h"
+   1:/usr/lib/avr/include/avr/wdt.h **** /* Copyright (c) 2002, 2004 Marek Michalkiewicz
+   2:/usr/lib/avr/include/avr/wdt.h ****    Copyright (c) 2005, 2006, 2007 Eric B. Weddington
+   3:/usr/lib/avr/include/avr/wdt.h ****    All rights reserved.
+   4:/usr/lib/avr/include/avr/wdt.h **** 
+   5:/usr/lib/avr/include/avr/wdt.h ****    Redistribution and use in source and binary forms, with or without
+   6:/usr/lib/avr/include/avr/wdt.h ****    modification, are permitted provided that the following conditions are met:
+   7:/usr/lib/avr/include/avr/wdt.h **** 
+   8:/usr/lib/avr/include/avr/wdt.h ****    * Redistributions of source code must retain the above copyright
+   9:/usr/lib/avr/include/avr/wdt.h ****      notice, this list of conditions and the following disclaimer.
+  10:/usr/lib/avr/include/avr/wdt.h **** 
+  11:/usr/lib/avr/include/avr/wdt.h ****    * Redistributions in binary form must reproduce the above copyright
+  12:/usr/lib/avr/include/avr/wdt.h ****      notice, this list of conditions and the following disclaimer in
+  13:/usr/lib/avr/include/avr/wdt.h ****      the documentation and/or other materials provided with the
+  14:/usr/lib/avr/include/avr/wdt.h ****      distribution.
+  15:/usr/lib/avr/include/avr/wdt.h **** 
+  16:/usr/lib/avr/include/avr/wdt.h ****    * Neither the name of the copyright holders nor the names of
+  17:/usr/lib/avr/include/avr/wdt.h ****      contributors may be used to endorse or promote products derived
+  18:/usr/lib/avr/include/avr/wdt.h ****      from this software without specific prior written permission.
+  19:/usr/lib/avr/include/avr/wdt.h **** 
+  20:/usr/lib/avr/include/avr/wdt.h ****   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  21:/usr/lib/avr/include/avr/wdt.h ****   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  22:/usr/lib/avr/include/avr/wdt.h ****   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  23:/usr/lib/avr/include/avr/wdt.h ****   ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+  24:/usr/lib/avr/include/avr/wdt.h ****   LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  25:/usr/lib/avr/include/avr/wdt.h ****   CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  26:/usr/lib/avr/include/avr/wdt.h ****   SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  27:/usr/lib/avr/include/avr/wdt.h ****   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  28:/usr/lib/avr/include/avr/wdt.h ****   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  29:/usr/lib/avr/include/avr/wdt.h ****   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+  30:/usr/lib/avr/include/avr/wdt.h ****   POSSIBILITY OF SUCH DAMAGE. */
+  31:/usr/lib/avr/include/avr/wdt.h **** 
+  32:/usr/lib/avr/include/avr/wdt.h **** /* $Id$ */
+  33:/usr/lib/avr/include/avr/wdt.h **** 
+  34:/usr/lib/avr/include/avr/wdt.h **** /*
+  35:/usr/lib/avr/include/avr/wdt.h ****    avr/wdt.h - macros for AVR watchdog timer
+  36:/usr/lib/avr/include/avr/wdt.h ****  */
+  37:/usr/lib/avr/include/avr/wdt.h **** 
+  38:/usr/lib/avr/include/avr/wdt.h **** #ifndef _AVR_WDT_H_
+  39:/usr/lib/avr/include/avr/wdt.h **** #define _AVR_WDT_H_
+  40:/usr/lib/avr/include/avr/wdt.h **** 
+  41:/usr/lib/avr/include/avr/wdt.h **** #include <avr/io.h>
+  42:/usr/lib/avr/include/avr/wdt.h **** #include <stdint.h>
+  43:/usr/lib/avr/include/avr/wdt.h **** 
+  44:/usr/lib/avr/include/avr/wdt.h **** /** \file */
+  45:/usr/lib/avr/include/avr/wdt.h **** /** \defgroup avr_watchdog <avr/wdt.h>: Watchdog timer handling
+  46:/usr/lib/avr/include/avr/wdt.h ****     \code #include <avr/wdt.h> \endcode
+  47:/usr/lib/avr/include/avr/wdt.h **** 
+  48:/usr/lib/avr/include/avr/wdt.h ****     This header file declares the interface to some inline macros
+  49:/usr/lib/avr/include/avr/wdt.h ****     handling the watchdog timer present in many AVR devices.  In order
+  50:/usr/lib/avr/include/avr/wdt.h ****     to prevent the watchdog timer configuration from being
+  51:/usr/lib/avr/include/avr/wdt.h ****     accidentally altered by a crashing application, a special timed
+  52:/usr/lib/avr/include/avr/wdt.h ****     sequence is required in order to change it.  The macros within
+  53:/usr/lib/avr/include/avr/wdt.h ****     this header file handle the required sequence automatically
+  54:/usr/lib/avr/include/avr/wdt.h ****     before changing any value.  Interrupts will be disabled during
+  55:/usr/lib/avr/include/avr/wdt.h ****     the manipulation.
+  56:/usr/lib/avr/include/avr/wdt.h **** 
+  57:/usr/lib/avr/include/avr/wdt.h ****     \note Depending on the fuse configuration of the particular
+  58:/usr/lib/avr/include/avr/wdt.h ****     device, further restrictions might apply, in particular it might
+  59:/usr/lib/avr/include/avr/wdt.h ****     be disallowed to turn off the watchdog timer.
+  60:/usr/lib/avr/include/avr/wdt.h **** 
+  61:/usr/lib/avr/include/avr/wdt.h ****     Note that for newer devices (ATmega88 and newer, effectively any
+  62:/usr/lib/avr/include/avr/wdt.h ****     AVR that has the option to also generate interrupts), the watchdog
+  63:/usr/lib/avr/include/avr/wdt.h ****     timer remains active even after a system reset (except a power-on
+  64:/usr/lib/avr/include/avr/wdt.h ****     condition), using the fastest prescaler value (approximately 15
+  65:/usr/lib/avr/include/avr/wdt.h ****     ms).  It is therefore required to turn off the watchdog early
+  66:/usr/lib/avr/include/avr/wdt.h ****     during program startup, the datasheet recommends a sequence like
+  67:/usr/lib/avr/include/avr/wdt.h ****     the following:
+  68:/usr/lib/avr/include/avr/wdt.h **** 
+  69:/usr/lib/avr/include/avr/wdt.h ****     \code
+  70:/usr/lib/avr/include/avr/wdt.h ****     #include <stdint.h>
+  71:/usr/lib/avr/include/avr/wdt.h ****     #include <avr/wdt.h>
+  72:/usr/lib/avr/include/avr/wdt.h **** 
+  73:/usr/lib/avr/include/avr/wdt.h ****     uint8_t mcusr_mirror __attribute__ ((section (".noinit")));
+  74:/usr/lib/avr/include/avr/wdt.h **** 
+  75:/usr/lib/avr/include/avr/wdt.h ****     void get_mcusr(void) \
+  76:/usr/lib/avr/include/avr/wdt.h ****       __attribute__((naked)) \
+  77:/usr/lib/avr/include/avr/wdt.h ****       __attribute__((section(".init3")));
+  78:/usr/lib/avr/include/avr/wdt.h ****     void get_mcusr(void)
+  79:/usr/lib/avr/include/avr/wdt.h ****     {
+  80:/usr/lib/avr/include/avr/wdt.h ****       mcusr_mirror = MCUSR;
+  81:/usr/lib/avr/include/avr/wdt.h ****       MCUSR = 0;
+  82:/usr/lib/avr/include/avr/wdt.h ****       wdt_disable();
+  83:/usr/lib/avr/include/avr/wdt.h ****     }
+  84:/usr/lib/avr/include/avr/wdt.h ****     \endcode
+  85:/usr/lib/avr/include/avr/wdt.h **** 
+  86:/usr/lib/avr/include/avr/wdt.h ****     Saving the value of MCUSR in \c mcusr_mirror is only needed if the
+  87:/usr/lib/avr/include/avr/wdt.h ****     application later wants to examine the reset source, but in particular, 
+  88:/usr/lib/avr/include/avr/wdt.h ****     clearing the watchdog reset flag before disabling the
+  89:/usr/lib/avr/include/avr/wdt.h ****     watchdog is required, according to the datasheet.
+  90:/usr/lib/avr/include/avr/wdt.h **** */
+  91:/usr/lib/avr/include/avr/wdt.h **** 
+  92:/usr/lib/avr/include/avr/wdt.h **** /**
+  93:/usr/lib/avr/include/avr/wdt.h ****    \ingroup avr_watchdog
+  94:/usr/lib/avr/include/avr/wdt.h ****    Reset the watchdog timer.  When the watchdog timer is enabled,
+  95:/usr/lib/avr/include/avr/wdt.h ****    a call to this instruction is required before the timer expires,
+  96:/usr/lib/avr/include/avr/wdt.h ****    otherwise a watchdog-initiated device reset will occur. 
+  97:/usr/lib/avr/include/avr/wdt.h **** */
+  98:/usr/lib/avr/include/avr/wdt.h **** 
+  99:/usr/lib/avr/include/avr/wdt.h **** #define wdt_reset() __asm__ __volatile__ ("wdr")
+ 100:/usr/lib/avr/include/avr/wdt.h **** 
+ 101:/usr/lib/avr/include/avr/wdt.h **** #ifndef __DOXYGEN__
+ 102:/usr/lib/avr/include/avr/wdt.h **** 
+ 103:/usr/lib/avr/include/avr/wdt.h **** #if defined(WDP3)
+ 104:/usr/lib/avr/include/avr/wdt.h **** # define _WD_PS3_MASK       _BV(WDP3)
+ 105:/usr/lib/avr/include/avr/wdt.h **** #else
+ 106:/usr/lib/avr/include/avr/wdt.h **** # define _WD_PS3_MASK       0x00
+ 107:/usr/lib/avr/include/avr/wdt.h **** #endif
+ 108:/usr/lib/avr/include/avr/wdt.h **** 
+ 109:/usr/lib/avr/include/avr/wdt.h **** #if defined(WDTCSR)
+ 110:/usr/lib/avr/include/avr/wdt.h **** #  define _WD_CONTROL_REG     WDTCSR
+ 111:/usr/lib/avr/include/avr/wdt.h **** #elif defined(WDTCR)
+ 112:/usr/lib/avr/include/avr/wdt.h **** #  define _WD_CONTROL_REG     WDTCR
+ 113:/usr/lib/avr/include/avr/wdt.h **** #else
+ 114:/usr/lib/avr/include/avr/wdt.h **** #  define _WD_CONTROL_REG     WDT
+ 115:/usr/lib/avr/include/avr/wdt.h **** #endif
+ 116:/usr/lib/avr/include/avr/wdt.h **** 
+ 117:/usr/lib/avr/include/avr/wdt.h **** #if defined(WDTOE)
+ 118:/usr/lib/avr/include/avr/wdt.h **** #define _WD_CHANGE_BIT      WDTOE
+ 119:/usr/lib/avr/include/avr/wdt.h **** #else
+ 120:/usr/lib/avr/include/avr/wdt.h **** #define _WD_CHANGE_BIT      WDCE
+ 121:/usr/lib/avr/include/avr/wdt.h **** #endif
+ 122:/usr/lib/avr/include/avr/wdt.h **** 
+ 123:/usr/lib/avr/include/avr/wdt.h **** #endif	/* !__DOXYGEN__ */
+ 124:/usr/lib/avr/include/avr/wdt.h **** 
+ 125:/usr/lib/avr/include/avr/wdt.h **** 
+ 126:/usr/lib/avr/include/avr/wdt.h **** /**
+ 127:/usr/lib/avr/include/avr/wdt.h ****    \ingroup avr_watchdog
+ 128:/usr/lib/avr/include/avr/wdt.h ****    Enable the watchdog timer, configuring it for expiry after
+ 129:/usr/lib/avr/include/avr/wdt.h ****    \c timeout (which is a combination of the \c WDP0 through
+ 130:/usr/lib/avr/include/avr/wdt.h ****    \c WDP2 bits to write into the \c WDTCR register; For those devices 
+ 131:/usr/lib/avr/include/avr/wdt.h ****    that have a \c WDTCSR register, it uses the combination of the \c WDP0 
+ 132:/usr/lib/avr/include/avr/wdt.h ****    through \c WDP3 bits).
+ 133:/usr/lib/avr/include/avr/wdt.h **** 
+ 134:/usr/lib/avr/include/avr/wdt.h ****    See also the symbolic constants \c WDTO_15MS et al.
+ 135:/usr/lib/avr/include/avr/wdt.h **** */
+ 136:/usr/lib/avr/include/avr/wdt.h **** 
+ 137:/usr/lib/avr/include/avr/wdt.h **** 
+ 138:/usr/lib/avr/include/avr/wdt.h **** #if defined(__AVR_XMEGA__)
+ 139:/usr/lib/avr/include/avr/wdt.h **** 
+ 140:/usr/lib/avr/include/avr/wdt.h **** #if defined (WDT_CTRLA) && !defined(RAMPD)
+ 141:/usr/lib/avr/include/avr/wdt.h **** 
+ 142:/usr/lib/avr/include/avr/wdt.h **** #define wdt_enable(timeout) \
+ 143:/usr/lib/avr/include/avr/wdt.h **** do { \
+ 144:/usr/lib/avr/include/avr/wdt.h **** uint8_t temp; \
+ 145:/usr/lib/avr/include/avr/wdt.h **** __asm__ __volatile__ ( \
+ 146:/usr/lib/avr/include/avr/wdt.h **** 	"wdr"									"\n\t" \
+ 147:/usr/lib/avr/include/avr/wdt.h **** 	"out %[ccp_reg], %[ioreg_cen_mask]"		"\n\t" \
+ 148:/usr/lib/avr/include/avr/wdt.h **** 	"lds %[tmp], %[wdt_reg]"				"\n\t" \
+ 149:/usr/lib/avr/include/avr/wdt.h **** 	"sbr %[tmp], %[wdt_enable_timeout]"		"\n\t" \
+ 150:/usr/lib/avr/include/avr/wdt.h **** 	"sts %[wdt_reg], %[tmp]"				"\n\t" \
+ 151:/usr/lib/avr/include/avr/wdt.h **** 	"1:lds %[tmp], %[wdt_status_reg]"		"\n\t" \
+ 152:/usr/lib/avr/include/avr/wdt.h **** 	"sbrc %[tmp], %[wdt_syncbusy_bit]"		"\n\t" \
+ 153:/usr/lib/avr/include/avr/wdt.h **** 	"rjmp 1b"								"\n\t" \
+ 154:/usr/lib/avr/include/avr/wdt.h **** 	: [tmp]					"=r" (temp) \
+ 155:/usr/lib/avr/include/avr/wdt.h **** 	: [ccp_reg]				"I"  (_SFR_IO_ADDR(CCP)), \
+ 156:/usr/lib/avr/include/avr/wdt.h **** 	  [ioreg_cen_mask]		"r"  ((uint8_t)CCP_IOREG_gc), \
+ 157:/usr/lib/avr/include/avr/wdt.h **** 	  [wdt_reg]				"n"  (_SFR_MEM_ADDR(WDT_CTRLA)), \
+ 158:/usr/lib/avr/include/avr/wdt.h **** 	  [wdt_enable_timeout]	"M"  (timeout), \
+ 159:/usr/lib/avr/include/avr/wdt.h **** 	  [wdt_status_reg]		"n"  (_SFR_MEM_ADDR(WDT_STATUS)), \
+ 160:/usr/lib/avr/include/avr/wdt.h **** 	  [wdt_syncbusy_bit]	"I"  (WDT_SYNCBUSY_bm) \
+ 161:/usr/lib/avr/include/avr/wdt.h **** ); \
+ 162:/usr/lib/avr/include/avr/wdt.h **** } while(0)
+ 163:/usr/lib/avr/include/avr/wdt.h **** 
+ 164:/usr/lib/avr/include/avr/wdt.h **** #define wdt_disable() \
+ 165:/usr/lib/avr/include/avr/wdt.h **** do { \
+ 166:/usr/lib/avr/include/avr/wdt.h **** uint8_t temp; \
+ 167:/usr/lib/avr/include/avr/wdt.h **** __asm__ __volatile__ (  \
+ 168:/usr/lib/avr/include/avr/wdt.h **** 	"wdr"								"\n\t" \
+ 169:/usr/lib/avr/include/avr/wdt.h **** 	"out %[ccp_reg], %[ioreg_cen_mask]" "\n\t" \
+ 170:/usr/lib/avr/include/avr/wdt.h **** 	"lds %[tmp], %[wdt_reg]"			"\n\t" \
+ 171:/usr/lib/avr/include/avr/wdt.h **** 	"cbr %[tmp], %[timeout_mask]"       "\n\t" \
+ 172:/usr/lib/avr/include/avr/wdt.h **** 	"sts %[wdt_reg], %[tmp]"			"\n\t" \
+ 173:/usr/lib/avr/include/avr/wdt.h ****     : [tmp]            "=r" (temp) \
+ 174:/usr/lib/avr/include/avr/wdt.h ****     : [ccp_reg]        "I" (_SFR_IO_ADDR(CCP)),       \
+ 175:/usr/lib/avr/include/avr/wdt.h ****       [ioreg_cen_mask] "r" ((uint8_t)CCP_IOREG_gc),   \
+ 176:/usr/lib/avr/include/avr/wdt.h ****       [wdt_reg]        "n" (_SFR_MEM_ADDR(WDT_CTRLA)),\
+ 177:/usr/lib/avr/include/avr/wdt.h ****       [timeout_mask]   "I" (WDT_PERIOD_gm) \
+ 178:/usr/lib/avr/include/avr/wdt.h **** ); \
+ 179:/usr/lib/avr/include/avr/wdt.h **** } while(0)
+ 180:/usr/lib/avr/include/avr/wdt.h **** 
+ 181:/usr/lib/avr/include/avr/wdt.h **** #else // defined (WDT_CTRLA) && !defined(RAMPD)
+ 182:/usr/lib/avr/include/avr/wdt.h **** 
+ 183:/usr/lib/avr/include/avr/wdt.h **** /*
+ 184:/usr/lib/avr/include/avr/wdt.h ****    wdt_enable(timeout) for xmega devices
+ 185:/usr/lib/avr/include/avr/wdt.h **** ** write signature (CCP_IOREG_gc) that enables change of protected I/O
+ 186:/usr/lib/avr/include/avr/wdt.h ****    registers to the CCP register
+ 187:/usr/lib/avr/include/avr/wdt.h **** ** At the same time,
+ 188:/usr/lib/avr/include/avr/wdt.h ****    1) set WDT change enable (WDT_CEN_bm)
+ 189:/usr/lib/avr/include/avr/wdt.h ****    2) enable WDT (WDT_ENABLE_bm)
+ 190:/usr/lib/avr/include/avr/wdt.h ****    3) set timeout (timeout)
+ 191:/usr/lib/avr/include/avr/wdt.h **** ** Synchronization starts when ENABLE bit of WDT is set. So, wait till it
+ 192:/usr/lib/avr/include/avr/wdt.h ****    finishes (SYNCBUSY of STATUS register is automatically cleared after the
+ 193:/usr/lib/avr/include/avr/wdt.h ****    sync is finished).
+ 194:/usr/lib/avr/include/avr/wdt.h **** */
+ 195:/usr/lib/avr/include/avr/wdt.h **** #define wdt_enable(timeout) \
+ 196:/usr/lib/avr/include/avr/wdt.h **** do { \
+ 197:/usr/lib/avr/include/avr/wdt.h **** uint8_t temp; \
+ 198:/usr/lib/avr/include/avr/wdt.h **** __asm__ __volatile__ (         \
+ 199:/usr/lib/avr/include/avr/wdt.h ****     "in __tmp_reg__, %[rampd]"              "\n\t" \
+ 200:/usr/lib/avr/include/avr/wdt.h ****     "out %[rampd], __zero_reg__"            "\n\t" \
+ 201:/usr/lib/avr/include/avr/wdt.h ****     "out %[ccp_reg], %[ioreg_cen_mask]"     "\n\t" \
+ 202:/usr/lib/avr/include/avr/wdt.h ****     "sts %[wdt_reg], %[wdt_enable_timeout]" "\n\t" \
+ 203:/usr/lib/avr/include/avr/wdt.h ****     "1:lds %[tmp], %[wdt_status_reg]"       "\n\t" \
+ 204:/usr/lib/avr/include/avr/wdt.h ****     "sbrc %[tmp], %[wdt_syncbusy_bit]"      "\n\t" \
+ 205:/usr/lib/avr/include/avr/wdt.h ****     "rjmp 1b"                               "\n\t" \
+ 206:/usr/lib/avr/include/avr/wdt.h ****     "out %[rampd], __tmp_reg__"             "\n\t" \
+ 207:/usr/lib/avr/include/avr/wdt.h ****     : [tmp]                "=r" (temp) \
+ 208:/usr/lib/avr/include/avr/wdt.h ****     : [rampd]              "I" (_SFR_IO_ADDR(RAMPD)),      \
+ 209:/usr/lib/avr/include/avr/wdt.h ****       [ccp_reg]            "I" (_SFR_IO_ADDR(CCP)),        \
+ 210:/usr/lib/avr/include/avr/wdt.h ****       [ioreg_cen_mask]     "r" ((uint8_t)CCP_IOREG_gc),     \
+ 211:/usr/lib/avr/include/avr/wdt.h ****       [wdt_reg]            "n" (_SFR_MEM_ADDR(WDT_CTRL)),   \
+ 212:/usr/lib/avr/include/avr/wdt.h ****       [wdt_enable_timeout] "r" ((uint8_t)(WDT_CEN_bm | WDT_ENABLE_bm | timeout)), \
+ 213:/usr/lib/avr/include/avr/wdt.h ****       [wdt_status_reg]     "n" (_SFR_MEM_ADDR(WDT_STATUS)), \
+ 214:/usr/lib/avr/include/avr/wdt.h ****       [wdt_syncbusy_bit]   "I" (WDT_SYNCBUSY_bm)            \
+ 215:/usr/lib/avr/include/avr/wdt.h ****     : "r0" \
+ 216:/usr/lib/avr/include/avr/wdt.h **** ); \
+ 217:/usr/lib/avr/include/avr/wdt.h **** } while(0)
+ 218:/usr/lib/avr/include/avr/wdt.h **** 
+ 219:/usr/lib/avr/include/avr/wdt.h **** #define wdt_disable() \
+ 220:/usr/lib/avr/include/avr/wdt.h **** __asm__ __volatile__ (  \
+ 221:/usr/lib/avr/include/avr/wdt.h ****     "in __tmp_reg__, %[rampd]"          "\n\t" \
+ 222:/usr/lib/avr/include/avr/wdt.h ****     "out %[rampd], __zero_reg__"        "\n\t" \
+ 223:/usr/lib/avr/include/avr/wdt.h ****     "out %[ccp_reg], %[ioreg_cen_mask]" "\n\t" \
+ 224:/usr/lib/avr/include/avr/wdt.h ****     "sts %[wdt_reg], %[disable_mask]"   "\n\t" \
+ 225:/usr/lib/avr/include/avr/wdt.h ****     "out %[rampd], __tmp_reg__"         "\n\t" \
+ 226:/usr/lib/avr/include/avr/wdt.h ****     : \
+ 227:/usr/lib/avr/include/avr/wdt.h ****     : [rampd]             "I" (_SFR_IO_ADDR(RAMPD)),    \
+ 228:/usr/lib/avr/include/avr/wdt.h ****       [ccp_reg]           "I" (_SFR_IO_ADDR(CCP)),      \
+ 229:/usr/lib/avr/include/avr/wdt.h ****       [ioreg_cen_mask]    "r" ((uint8_t)CCP_IOREG_gc),   \
+ 230:/usr/lib/avr/include/avr/wdt.h ****       [wdt_reg]           "n" (_SFR_MEM_ADDR(WDT_CTRL)), \
+ 231:/usr/lib/avr/include/avr/wdt.h ****       [disable_mask]      "r" ((uint8_t)((~WDT_ENABLE_bm) | WDT_CEN_bm)) \
+ 232:/usr/lib/avr/include/avr/wdt.h ****     : "r0" \
+ 233:/usr/lib/avr/include/avr/wdt.h **** );
+ 234:/usr/lib/avr/include/avr/wdt.h **** 
+ 235:/usr/lib/avr/include/avr/wdt.h **** #endif // defined (WDT_CTRLA) && !defined(RAMPD)
+ 236:/usr/lib/avr/include/avr/wdt.h **** 
+ 237:/usr/lib/avr/include/avr/wdt.h **** #elif defined(__AVR_TINY__)
+ 238:/usr/lib/avr/include/avr/wdt.h **** 
+ 239:/usr/lib/avr/include/avr/wdt.h **** #define wdt_enable(value) \
+ 240:/usr/lib/avr/include/avr/wdt.h **** __asm__ __volatile__ ( \
+ 241:/usr/lib/avr/include/avr/wdt.h ****     "in __tmp_reg__,__SREG__" "\n\t"  \
+ 242:/usr/lib/avr/include/avr/wdt.h ****     "cli" "\n\t"  \
+ 243:/usr/lib/avr/include/avr/wdt.h ****     "wdr" "\n\t"  \
+ 244:/usr/lib/avr/include/avr/wdt.h ****     "out %[CCPADDRESS],%[SIGNATURE]" "\n\t"  \
+ 245:/usr/lib/avr/include/avr/wdt.h ****     "out %[WDTREG],%[WDVALUE]" "\n\t"  \
+ 246:/usr/lib/avr/include/avr/wdt.h ****     "out __SREG__,__tmp_reg__" "\n\t"  \
+ 247:/usr/lib/avr/include/avr/wdt.h ****     : /* no outputs */  \
+ 248:/usr/lib/avr/include/avr/wdt.h ****     : [CCPADDRESS] "I" (_SFR_IO_ADDR(CCP)),  \
+ 249:/usr/lib/avr/include/avr/wdt.h ****       [SIGNATURE] "r" ((uint8_t)0xD8), \
+ 250:/usr/lib/avr/include/avr/wdt.h ****       [WDTREG] "I" (_SFR_IO_ADDR(_WD_CONTROL_REG)), \
+ 251:/usr/lib/avr/include/avr/wdt.h ****       [WDVALUE] "r" ((uint8_t)((value & 0x08 ? _WD_PS3_MASK : 0x00) \
+ 252:/usr/lib/avr/include/avr/wdt.h ****       | _BV(WDE) | (value & 0x07) )) \
+ 253:/usr/lib/avr/include/avr/wdt.h ****     : "r16" \
+ 254:/usr/lib/avr/include/avr/wdt.h **** )
+ 255:/usr/lib/avr/include/avr/wdt.h **** 
+ 256:/usr/lib/avr/include/avr/wdt.h **** #define wdt_disable() \
+ 257:/usr/lib/avr/include/avr/wdt.h **** do { \
+ 258:/usr/lib/avr/include/avr/wdt.h **** uint8_t temp_wd; \
+ 259:/usr/lib/avr/include/avr/wdt.h **** __asm__ __volatile__ ( \
+ 260:/usr/lib/avr/include/avr/wdt.h ****     "in __tmp_reg__,__SREG__" "\n\t"  \
+ 261:/usr/lib/avr/include/avr/wdt.h ****     "cli" "\n\t"  \
+ 262:/usr/lib/avr/include/avr/wdt.h ****     "wdr" "\n\t"  \
+ 263:/usr/lib/avr/include/avr/wdt.h ****     "out %[CCPADDRESS],%[SIGNATURE]" "\n\t"  \
+ 264:/usr/lib/avr/include/avr/wdt.h ****     "in  %[TEMP_WD],%[WDTREG]" "\n\t" \
+ 265:/usr/lib/avr/include/avr/wdt.h ****     "cbr %[TEMP_WD],%[WDVALUE]" "\n\t" \
+ 266:/usr/lib/avr/include/avr/wdt.h ****     "out %[WDTREG],%[TEMP_WD]" "\n\t" \
+ 267:/usr/lib/avr/include/avr/wdt.h ****     "out __SREG__,__tmp_reg__" "\n\t" \
+ 268:/usr/lib/avr/include/avr/wdt.h ****     : /*no output */ \
+ 269:/usr/lib/avr/include/avr/wdt.h ****     : [CCPADDRESS] "I" (_SFR_IO_ADDR(CCP)), \
+ 270:/usr/lib/avr/include/avr/wdt.h ****       [SIGNATURE] "r" ((uint8_t)0xD8), \
+ 271:/usr/lib/avr/include/avr/wdt.h ****       [WDTREG] "I" (_SFR_IO_ADDR(_WD_CONTROL_REG)), \
+ 272:/usr/lib/avr/include/avr/wdt.h ****       [TEMP_WD] "d" (temp_wd), \
+ 273:/usr/lib/avr/include/avr/wdt.h ****       [WDVALUE] "n" (1 << WDE) \
+ 274:/usr/lib/avr/include/avr/wdt.h ****     : "r16" \
+ 275:/usr/lib/avr/include/avr/wdt.h **** ); \
+ 276:/usr/lib/avr/include/avr/wdt.h **** }while(0)
+ 277:/usr/lib/avr/include/avr/wdt.h **** 
+ 278:/usr/lib/avr/include/avr/wdt.h **** #elif defined(CCP)
+ 279:/usr/lib/avr/include/avr/wdt.h **** 
+ 280:/usr/lib/avr/include/avr/wdt.h **** static __inline__
+ 281:/usr/lib/avr/include/avr/wdt.h **** __attribute__ ((__always_inline__))
+ 282:/usr/lib/avr/include/avr/wdt.h **** void wdt_enable (const uint8_t value)
+ 283:/usr/lib/avr/include/avr/wdt.h **** {
+ 284:/usr/lib/avr/include/avr/wdt.h **** 	if (!_SFR_IO_REG_P (CCP) && !_SFR_IO_REG_P (_WD_CONTROL_REG))
+ 285:/usr/lib/avr/include/avr/wdt.h **** 	{
+ 286:/usr/lib/avr/include/avr/wdt.h **** 		__asm__ __volatile__ (
+ 287:/usr/lib/avr/include/avr/wdt.h **** 			"in __tmp_reg__,__SREG__" "\n\t"
+ 288:/usr/lib/avr/include/avr/wdt.h **** 			"cli" "\n\t"
+ 289:/usr/lib/avr/include/avr/wdt.h **** 			"wdr" "\n\t"
+ 290:/usr/lib/avr/include/avr/wdt.h **** 			"sts %[CCPADDRESS],%[SIGNATURE]" "\n\t"
+ 291:/usr/lib/avr/include/avr/wdt.h **** 			"sts %[WDTREG],%[WDVALUE]" "\n\t"
+ 292:/usr/lib/avr/include/avr/wdt.h **** 			"out __SREG__,__tmp_reg__" "\n\t"
+ 293:/usr/lib/avr/include/avr/wdt.h **** 			: /* no outputs */
+ 294:/usr/lib/avr/include/avr/wdt.h **** 			: [CCPADDRESS] "n" (_SFR_MEM_ADDR(CCP)),
+ 295:/usr/lib/avr/include/avr/wdt.h **** 			[SIGNATURE] "r" ((uint8_t)0xD8),
+ 296:/usr/lib/avr/include/avr/wdt.h **** 			[WDTREG] "n" (_SFR_MEM_ADDR(_WD_CONTROL_REG)),
+ 297:/usr/lib/avr/include/avr/wdt.h **** 			[WDVALUE] "r" ((uint8_t)((value & 0x08 ? _WD_PS3_MASK : 0x00)
+ 298:/usr/lib/avr/include/avr/wdt.h **** 				| _BV(WDE) | (value & 0x07) ))
+ 299:/usr/lib/avr/include/avr/wdt.h **** 			: "r0"
+ 300:/usr/lib/avr/include/avr/wdt.h **** 			);
+ 301:/usr/lib/avr/include/avr/wdt.h **** 	}
+ 302:/usr/lib/avr/include/avr/wdt.h **** 	else if (!_SFR_IO_REG_P (CCP) && _SFR_IO_REG_P (_WD_CONTROL_REG))
+ 303:/usr/lib/avr/include/avr/wdt.h **** 	{
+ 304:/usr/lib/avr/include/avr/wdt.h **** 		__asm__ __volatile__ (
+ 305:/usr/lib/avr/include/avr/wdt.h **** 			"in __tmp_reg__,__SREG__" "\n\t"
+ 306:/usr/lib/avr/include/avr/wdt.h **** 			"cli" "\n\t"
+ 307:/usr/lib/avr/include/avr/wdt.h **** 			"wdr" "\n\t"
+ 308:/usr/lib/avr/include/avr/wdt.h **** 			"sts %[CCPADDRESS],%[SIGNATURE]" "\n\t"
+ 309:/usr/lib/avr/include/avr/wdt.h **** 			"out %[WDTREG],%[WDVALUE]" "\n\t"
+ 310:/usr/lib/avr/include/avr/wdt.h **** 			"out __SREG__,__tmp_reg__" "\n\t"
+ 311:/usr/lib/avr/include/avr/wdt.h **** 			: /* no outputs */
+ 312:/usr/lib/avr/include/avr/wdt.h **** 			: [CCPADDRESS] "n" (_SFR_MEM_ADDR(CCP)),
+ 313:/usr/lib/avr/include/avr/wdt.h **** 			[SIGNATURE] "r" ((uint8_t)0xD8),
+ 314:/usr/lib/avr/include/avr/wdt.h **** 			[WDTREG] "I" (_SFR_IO_ADDR(_WD_CONTROL_REG)),
+ 315:/usr/lib/avr/include/avr/wdt.h **** 			[WDVALUE] "r" ((uint8_t)((value & 0x08 ? _WD_PS3_MASK : 0x00)
+ 316:/usr/lib/avr/include/avr/wdt.h **** 				| _BV(WDE) | (value & 0x07) ))
+ 317:/usr/lib/avr/include/avr/wdt.h **** 			: "r0"
+ 318:/usr/lib/avr/include/avr/wdt.h **** 			);
+ 319:/usr/lib/avr/include/avr/wdt.h **** 	}
+ 320:/usr/lib/avr/include/avr/wdt.h **** 	else if (_SFR_IO_REG_P (CCP) && !_SFR_IO_REG_P (_WD_CONTROL_REG))
+ 321:/usr/lib/avr/include/avr/wdt.h **** 	{
+ 322:/usr/lib/avr/include/avr/wdt.h **** 		__asm__ __volatile__ (
+ 323:/usr/lib/avr/include/avr/wdt.h **** 			"in __tmp_reg__,__SREG__" "\n\t"
+ 324:/usr/lib/avr/include/avr/wdt.h **** 			"cli" "\n\t"
+ 325:/usr/lib/avr/include/avr/wdt.h **** 			"wdr" "\n\t"
+ 326:/usr/lib/avr/include/avr/wdt.h **** 			"out %[CCPADDRESS],%[SIGNATURE]" "\n\t"
+ 327:/usr/lib/avr/include/avr/wdt.h **** 			"sts %[WDTREG],%[WDVALUE]" "\n\t"
+ 328:/usr/lib/avr/include/avr/wdt.h **** 			"out __SREG__,__tmp_reg__" "\n\t"
+ 329:/usr/lib/avr/include/avr/wdt.h **** 			: /* no outputs */
+ 330:/usr/lib/avr/include/avr/wdt.h **** 			: [CCPADDRESS] "I" (_SFR_IO_ADDR(CCP)),
+ 331:/usr/lib/avr/include/avr/wdt.h **** 			[SIGNATURE] "r" ((uint8_t)0xD8),
+ 332:/usr/lib/avr/include/avr/wdt.h **** 			[WDTREG] "n" (_SFR_MEM_ADDR(_WD_CONTROL_REG)),
+ 333:/usr/lib/avr/include/avr/wdt.h **** 			[WDVALUE] "r" ((uint8_t)((value & 0x08 ? _WD_PS3_MASK : 0x00)
+ 334:/usr/lib/avr/include/avr/wdt.h **** 				| _BV(WDE) | (value & 0x07) ))
+ 335:/usr/lib/avr/include/avr/wdt.h **** 			: "r0"
+ 336:/usr/lib/avr/include/avr/wdt.h **** 			);
+ 337:/usr/lib/avr/include/avr/wdt.h **** 	}
+ 338:/usr/lib/avr/include/avr/wdt.h **** 	else
+ 339:/usr/lib/avr/include/avr/wdt.h ****  	{
+ 340:/usr/lib/avr/include/avr/wdt.h **** 		__asm__ __volatile__ (
+ 341:/usr/lib/avr/include/avr/wdt.h **** 			"in __tmp_reg__,__SREG__" "\n\t"
+ 342:/usr/lib/avr/include/avr/wdt.h **** 			"cli" "\n\t"
+ 343:/usr/lib/avr/include/avr/wdt.h **** 			"wdr" "\n\t"
+ 344:/usr/lib/avr/include/avr/wdt.h **** 			"out %[CCPADDRESS],%[SIGNATURE]" "\n\t"
+ 345:/usr/lib/avr/include/avr/wdt.h **** 			"out %[WDTREG],%[WDVALUE]" "\n\t"
+ 346:/usr/lib/avr/include/avr/wdt.h **** 			"out __SREG__,__tmp_reg__" "\n\t"
+ 347:/usr/lib/avr/include/avr/wdt.h **** 			: /* no outputs */
+ 348:/usr/lib/avr/include/avr/wdt.h **** 			: [CCPADDRESS] "I" (_SFR_IO_ADDR(CCP)),
+ 349:/usr/lib/avr/include/avr/wdt.h **** 			[SIGNATURE] "r" ((uint8_t)0xD8),
+ 350:/usr/lib/avr/include/avr/wdt.h **** 			[WDTREG] "I" (_SFR_IO_ADDR(_WD_CONTROL_REG)),
+ 351:/usr/lib/avr/include/avr/wdt.h **** 			[WDVALUE] "r" ((uint8_t)((value & 0x08 ? _WD_PS3_MASK : 0x00)
+ 352:/usr/lib/avr/include/avr/wdt.h **** 				| _BV(WDE) | (value & 0x07) ))
+ 353:/usr/lib/avr/include/avr/wdt.h **** 			: "r0"
+ 354:/usr/lib/avr/include/avr/wdt.h **** 			);
+ 355:/usr/lib/avr/include/avr/wdt.h **** 	}
+ 356:/usr/lib/avr/include/avr/wdt.h **** }
+ 357:/usr/lib/avr/include/avr/wdt.h **** 
+ 358:/usr/lib/avr/include/avr/wdt.h **** static __inline__
+ 359:/usr/lib/avr/include/avr/wdt.h **** __attribute__ ((__always_inline__))
+ 360:/usr/lib/avr/include/avr/wdt.h **** void wdt_disable (void)
+ 361:/usr/lib/avr/include/avr/wdt.h **** {
+ 362:/usr/lib/avr/include/avr/wdt.h **** 	if (!_SFR_IO_REG_P (CCP) && !_SFR_IO_REG_P(_WD_CONTROL_REG))
+ 363:/usr/lib/avr/include/avr/wdt.h **** 	{
+ 364:/usr/lib/avr/include/avr/wdt.h ****         uint8_t temp_wd;
+ 365:/usr/lib/avr/include/avr/wdt.h ****         __asm__ __volatile__ (
+ 366:/usr/lib/avr/include/avr/wdt.h **** 				"in __tmp_reg__,__SREG__" "\n\t"
+ 367:/usr/lib/avr/include/avr/wdt.h **** 				"cli" "\n\t"
+ 368:/usr/lib/avr/include/avr/wdt.h **** 				"wdr" "\n\t"
+ 369:/usr/lib/avr/include/avr/wdt.h **** 				"sts %[CCPADDRESS],%[SIGNATURE]" "\n\t"
+ 370:/usr/lib/avr/include/avr/wdt.h **** 				"lds %[TEMP_WD],%[WDTREG]" "\n\t"
+ 371:/usr/lib/avr/include/avr/wdt.h **** 				"cbr %[TEMP_WD],%[WDVALUE]" "\n\t"
+ 372:/usr/lib/avr/include/avr/wdt.h **** 				"sts %[WDTREG],%[TEMP_WD]" "\n\t"
+ 373:/usr/lib/avr/include/avr/wdt.h **** 				"out __SREG__,__tmp_reg__" "\n\t"
+ 374:/usr/lib/avr/include/avr/wdt.h **** 				: /*no output */
+ 375:/usr/lib/avr/include/avr/wdt.h **** 				: [CCPADDRESS] "n" (_SFR_MEM_ADDR(CCP)),
+ 376:/usr/lib/avr/include/avr/wdt.h **** 				[SIGNATURE] "r" ((uint8_t)0xD8),
+ 377:/usr/lib/avr/include/avr/wdt.h **** 				[WDTREG] "n" (_SFR_MEM_ADDR(_WD_CONTROL_REG)),
+ 378:/usr/lib/avr/include/avr/wdt.h **** 				[TEMP_WD] "d" (temp_wd),
+ 379:/usr/lib/avr/include/avr/wdt.h **** 				[WDVALUE] "n" (1 << WDE)
+ 380:/usr/lib/avr/include/avr/wdt.h **** 				: "r0"
+ 381:/usr/lib/avr/include/avr/wdt.h **** 				);
+ 382:/usr/lib/avr/include/avr/wdt.h **** 	}
+ 383:/usr/lib/avr/include/avr/wdt.h **** 	else if (!_SFR_IO_REG_P (CCP) && _SFR_IO_REG_P(_WD_CONTROL_REG))
+ 384:/usr/lib/avr/include/avr/wdt.h **** 	{
+ 385:/usr/lib/avr/include/avr/wdt.h ****         uint8_t temp_wd;
+ 386:/usr/lib/avr/include/avr/wdt.h ****         __asm__ __volatile__ (
+ 387:/usr/lib/avr/include/avr/wdt.h **** 				"in __tmp_reg__,__SREG__" "\n\t"
+ 388:/usr/lib/avr/include/avr/wdt.h **** 				"cli" "\n\t"
+ 389:/usr/lib/avr/include/avr/wdt.h **** 				"wdr" "\n\t"
+ 390:/usr/lib/avr/include/avr/wdt.h **** 				"sts %[CCPADDRESS],%[SIGNATURE]" "\n\t"
+ 391:/usr/lib/avr/include/avr/wdt.h **** 				"in %[TEMP_WD],%[WDTREG]" "\n\t"
+ 392:/usr/lib/avr/include/avr/wdt.h **** 				"cbr %[TEMP_WD],%[WDVALUE]" "\n\t"
+ 393:/usr/lib/avr/include/avr/wdt.h **** 				"out %[WDTREG],%[TEMP_WD]" "\n\t"
+ 394:/usr/lib/avr/include/avr/wdt.h **** 				"out __SREG__,__tmp_reg__" "\n\t"
+ 395:/usr/lib/avr/include/avr/wdt.h **** 				: /*no output */
+ 396:/usr/lib/avr/include/avr/wdt.h **** 				: [CCPADDRESS] "n" (_SFR_MEM_ADDR(CCP)),
+ 397:/usr/lib/avr/include/avr/wdt.h **** 				[SIGNATURE] "r" ((uint8_t)0xD8),
+ 398:/usr/lib/avr/include/avr/wdt.h **** 				[WDTREG] "I" (_SFR_IO_ADDR(_WD_CONTROL_REG)),
+ 399:/usr/lib/avr/include/avr/wdt.h **** 				[TEMP_WD] "d" (temp_wd),
+ 400:/usr/lib/avr/include/avr/wdt.h **** 				[WDVALUE] "n" (1 << WDE)
+ 401:/usr/lib/avr/include/avr/wdt.h **** 				: "r0"
+ 402:/usr/lib/avr/include/avr/wdt.h **** 				);
+ 403:/usr/lib/avr/include/avr/wdt.h **** 	}
+ 404:/usr/lib/avr/include/avr/wdt.h **** 	else if (_SFR_IO_REG_P (CCP) && !_SFR_IO_REG_P(_WD_CONTROL_REG))
+ 405:/usr/lib/avr/include/avr/wdt.h **** 	{
+ 406:/usr/lib/avr/include/avr/wdt.h ****         uint8_t temp_wd;
+ 407:/usr/lib/avr/include/avr/wdt.h ****         __asm__ __volatile__ (
+ 408:/usr/lib/avr/include/avr/wdt.h **** 				"in __tmp_reg__,__SREG__" "\n\t"
+ 409:/usr/lib/avr/include/avr/wdt.h **** 				"cli" "\n\t"
+ 410:/usr/lib/avr/include/avr/wdt.h **** 				"wdr" "\n\t"
+ 411:/usr/lib/avr/include/avr/wdt.h **** 				"out %[CCPADDRESS],%[SIGNATURE]" "\n\t"
+ 412:/usr/lib/avr/include/avr/wdt.h **** 				"lds %[TEMP_WD],%[WDTREG]" "\n\t"
+ 413:/usr/lib/avr/include/avr/wdt.h **** 				"cbr %[TEMP_WD],%[WDVALUE]" "\n\t"
+ 414:/usr/lib/avr/include/avr/wdt.h **** 				"sts %[WDTREG],%[TEMP_WD]" "\n\t"
+ 415:/usr/lib/avr/include/avr/wdt.h **** 				"out __SREG__,__tmp_reg__" "\n\t"
+ 416:/usr/lib/avr/include/avr/wdt.h **** 				: /*no output */
+ 417:/usr/lib/avr/include/avr/wdt.h **** 				: [CCPADDRESS] "I" (_SFR_IO_ADDR(CCP)),
+ 418:/usr/lib/avr/include/avr/wdt.h **** 				[SIGNATURE] "r" ((uint8_t)0xD8),
+ 419:/usr/lib/avr/include/avr/wdt.h **** 				[WDTREG] "n" (_SFR_MEM_ADDR(_WD_CONTROL_REG)),
+ 420:/usr/lib/avr/include/avr/wdt.h **** 				[TEMP_WD] "d" (temp_wd),
+ 421:/usr/lib/avr/include/avr/wdt.h **** 				[WDVALUE] "n" (1 << WDE)
+ 422:/usr/lib/avr/include/avr/wdt.h **** 				: "r0"
+ 423:/usr/lib/avr/include/avr/wdt.h **** 				);
+ 424:/usr/lib/avr/include/avr/wdt.h **** 	}
+ 425:/usr/lib/avr/include/avr/wdt.h **** 	else
+ 426:/usr/lib/avr/include/avr/wdt.h **** 	{
+ 427:/usr/lib/avr/include/avr/wdt.h ****         uint8_t temp_wd;
+ 428:/usr/lib/avr/include/avr/wdt.h ****         __asm__ __volatile__ (
+ 429:/usr/lib/avr/include/avr/wdt.h **** 				"in __tmp_reg__,__SREG__" "\n\t"
+ 430:/usr/lib/avr/include/avr/wdt.h **** 				"cli" "\n\t"
+ 431:/usr/lib/avr/include/avr/wdt.h **** 				"wdr" "\n\t"
+ 432:/usr/lib/avr/include/avr/wdt.h **** 				"out %[CCPADDRESS],%[SIGNATURE]" "\n\t"
+ 433:/usr/lib/avr/include/avr/wdt.h **** 				"in %[TEMP_WD],%[WDTREG]" "\n\t"
+ 434:/usr/lib/avr/include/avr/wdt.h **** 				"cbr %[TEMP_WD],%[WDVALUE]" "\n\t"
+ 435:/usr/lib/avr/include/avr/wdt.h **** 				"out %[WDTREG],%[TEMP_WD]" "\n\t"
+ 436:/usr/lib/avr/include/avr/wdt.h **** 				"out __SREG__,__tmp_reg__" "\n\t"
+ 437:/usr/lib/avr/include/avr/wdt.h **** 				: /*no output */
+ 438:/usr/lib/avr/include/avr/wdt.h **** 				: [CCPADDRESS] "I" (_SFR_IO_ADDR(CCP)),
+ 439:/usr/lib/avr/include/avr/wdt.h **** 				[SIGNATURE] "r" ((uint8_t)0xD8),
+ 440:/usr/lib/avr/include/avr/wdt.h **** 				[WDTREG] "I" (_SFR_IO_ADDR(_WD_CONTROL_REG)),
+ 441:/usr/lib/avr/include/avr/wdt.h **** 				[TEMP_WD] "d" (temp_wd),
+ 442:/usr/lib/avr/include/avr/wdt.h **** 				[WDVALUE] "n" (1 << WDE)
+ 443:/usr/lib/avr/include/avr/wdt.h **** 				: "r0"
+ 444:/usr/lib/avr/include/avr/wdt.h **** 				);
+ 445:/usr/lib/avr/include/avr/wdt.h **** 	}
+ 446:/usr/lib/avr/include/avr/wdt.h **** }
+ 447:/usr/lib/avr/include/avr/wdt.h **** 
+ 448:/usr/lib/avr/include/avr/wdt.h **** #else
+ 449:/usr/lib/avr/include/avr/wdt.h **** 
+ 450:/usr/lib/avr/include/avr/wdt.h **** static __inline__
+ 451:/usr/lib/avr/include/avr/wdt.h **** __attribute__ ((__always_inline__))
+ 452:/usr/lib/avr/include/avr/wdt.h **** void wdt_enable (const uint8_t value)
+ 453:/usr/lib/avr/include/avr/wdt.h **** {
+ 454:/usr/lib/avr/include/avr/wdt.h **** 	if (_SFR_IO_REG_P (_WD_CONTROL_REG))
+ 455:/usr/lib/avr/include/avr/wdt.h **** 	{
+ 456:/usr/lib/avr/include/avr/wdt.h **** 		__asm__ __volatile__ (
+ 457:/usr/lib/avr/include/avr/wdt.h **** 				"in __tmp_reg__,__SREG__" "\n\t"
+ 458:/usr/lib/avr/include/avr/wdt.h **** 				"cli" "\n\t"
+ 459:/usr/lib/avr/include/avr/wdt.h **** 				"wdr" "\n\t"
+ 460:/usr/lib/avr/include/avr/wdt.h **** 				"out %0, %1" "\n\t"
+ 461:/usr/lib/avr/include/avr/wdt.h **** 				"out __SREG__,__tmp_reg__" "\n\t"
+ 462:/usr/lib/avr/include/avr/wdt.h **** 				"out %0, %2" "\n \t"
+ 463:/usr/lib/avr/include/avr/wdt.h **** 				: /* no outputs */
+ 464:/usr/lib/avr/include/avr/wdt.h **** 				: "I" (_SFR_IO_ADDR(_WD_CONTROL_REG)),
+ 465:/usr/lib/avr/include/avr/wdt.h **** 				"r" ((uint8_t)(_BV(_WD_CHANGE_BIT) | _BV(WDE))),
+ 466:/usr/lib/avr/include/avr/wdt.h **** 				"r" ((uint8_t) ((value & 0x08 ? _WD_PS3_MASK : 0x00) |
+ 467:/usr/lib/avr/include/avr/wdt.h **** 						_BV(WDE) | (value & 0x07)) )
+ 468:/usr/lib/avr/include/avr/wdt.h **** 				: "r0"
+ 469:/usr/lib/avr/include/avr/wdt.h **** 		);
+ 470:/usr/lib/avr/include/avr/wdt.h **** 	}
+ 471:/usr/lib/avr/include/avr/wdt.h **** 	else
+ 472:/usr/lib/avr/include/avr/wdt.h **** 	{
+ 473:/usr/lib/avr/include/avr/wdt.h **** 		__asm__ __volatile__ (
+ 474:/usr/lib/avr/include/avr/wdt.h **** 				"in __tmp_reg__,__SREG__" "\n\t"
+ 475:/usr/lib/avr/include/avr/wdt.h **** 				"cli" "\n\t"
+ 476:/usr/lib/avr/include/avr/wdt.h **** 				"wdr" "\n\t"
+ 477:/usr/lib/avr/include/avr/wdt.h **** 				"sts %0, %1" "\n\t"
+ 478:/usr/lib/avr/include/avr/wdt.h **** 				"out __SREG__,__tmp_reg__" "\n\t"
+ 479:/usr/lib/avr/include/avr/wdt.h **** 				"sts %0, %2" "\n \t"
+ 480:/usr/lib/avr/include/avr/wdt.h **** 				: /* no outputs */
+ 481:/usr/lib/avr/include/avr/wdt.h **** 				: "n" (_SFR_MEM_ADDR(_WD_CONTROL_REG)),
+ 482:/usr/lib/avr/include/avr/wdt.h **** 				"r" ((uint8_t)(_BV(_WD_CHANGE_BIT) | _BV(WDE))),
+ 483:/usr/lib/avr/include/avr/wdt.h **** 				"r" ((uint8_t) ((value & 0x08 ? _WD_PS3_MASK : 0x00) |
+ 484:/usr/lib/avr/include/avr/wdt.h **** 						_BV(WDE) | (value & 0x07)) )
+ 485:/usr/lib/avr/include/avr/wdt.h **** 				: "r0"
+ 486:/usr/lib/avr/include/avr/wdt.h **** 		);
+ 487:/usr/lib/avr/include/avr/wdt.h **** 	}
+ 488:/usr/lib/avr/include/avr/wdt.h **** }
+ 489:/usr/lib/avr/include/avr/wdt.h **** 
+ 490:/usr/lib/avr/include/avr/wdt.h **** static __inline__
+ 491:/usr/lib/avr/include/avr/wdt.h **** __attribute__ ((__always_inline__))
+ 492:/usr/lib/avr/include/avr/wdt.h **** void wdt_disable (void)
+ 493:/usr/lib/avr/include/avr/wdt.h **** {
+ 494:/usr/lib/avr/include/avr/wdt.h **** 	if (_SFR_IO_REG_P (_WD_CONTROL_REG))
+ 495:/usr/lib/avr/include/avr/wdt.h **** 	{
+ 496:/usr/lib/avr/include/avr/wdt.h ****         uint8_t register temp_reg;
+ 497:/usr/lib/avr/include/avr/wdt.h **** 		__asm__ __volatile__ (
+ 498:/usr/lib/avr/include/avr/wdt.h **** 				"in __tmp_reg__,__SREG__"    "\n\t"
+ 499:/usr/lib/avr/include/avr/wdt.h **** 				"cli"                        "\n\t"
+ 500:/usr/lib/avr/include/avr/wdt.h **** 				"wdr"                        "\n\t"
+ 501:/usr/lib/avr/include/avr/wdt.h **** 				"in  %[TEMPREG],%[WDTREG]"   "\n\t"
+ 502:/usr/lib/avr/include/avr/wdt.h **** 				"ori %[TEMPREG],%[WDCE_WDE]" "\n\t"
+ 503:/usr/lib/avr/include/avr/wdt.h **** 				"out %[WDTREG],%[TEMPREG]"   "\n\t"
+ 504:/usr/lib/avr/include/avr/wdt.h **** 				"out %[WDTREG],__zero_reg__" "\n\t"
+ 505:/usr/lib/avr/include/avr/wdt.h **** 				"out __SREG__,__tmp_reg__"   "\n\t"
+ 506:/usr/lib/avr/include/avr/wdt.h **** 				: [TEMPREG] "=d" (temp_reg)
+ 507:/usr/lib/avr/include/avr/wdt.h **** 				: [WDTREG]  "I"  (_SFR_IO_ADDR(_WD_CONTROL_REG)),
+ 508:/usr/lib/avr/include/avr/wdt.h **** 				[WDCE_WDE]  "n"  ((uint8_t)(_BV(_WD_CHANGE_BIT) | _BV(WDE)))
+ 509:/usr/lib/avr/include/avr/wdt.h **** 				: "r0"
+ 510:/usr/lib/avr/include/avr/wdt.h **** 		);
+ 511:/usr/lib/avr/include/avr/wdt.h **** 	}
+ 512:/usr/lib/avr/include/avr/wdt.h **** 	else
+ 513:/usr/lib/avr/include/avr/wdt.h **** 	{
+ 514:/usr/lib/avr/include/avr/wdt.h ****         uint8_t register temp_reg;
+ 515:/usr/lib/avr/include/avr/wdt.h **** 		__asm__ __volatile__ (
+  65               		.loc 2 515 0
+  66               	/* #APP */
+  67               	 ;  515 "/usr/lib/avr/include/avr/wdt.h" 1
+  68 0018 0FB6      		in __tmp_reg__,__SREG__
+  69 001a F894      		cli
+  70 001c A895      		wdr
+  71 001e 8091 6000 		lds r24,96
+  72 0022 8861      		ori r24,24
+  73 0024 8093 6000 		sts 96,r24
+  74 0028 1092 6000 		sts 96,__zero_reg__
+  75 002c 0FBE      		out __SREG__,__tmp_reg__
+  76               		
+  77               	 ;  0 "" 2
+  78               	.LVL0:
+  79               	/* #NOAPP */
+  80               	.LBE61:
+  81               	.LBE60:
+  82               	.LBB62:
+  83               	.LBB63:
+  84               		.file 3 "../../LUFA/Drivers/Peripheral/Serial.h"
+   1:../../LUFA/Drivers/Peripheral/Serial.h **** /*
+   2:../../LUFA/Drivers/Peripheral/Serial.h ****              LUFA Library
+   3:../../LUFA/Drivers/Peripheral/Serial.h ****      Copyright (C) Dean Camera, 2010.
+   4:../../LUFA/Drivers/Peripheral/Serial.h ****               
+   5:../../LUFA/Drivers/Peripheral/Serial.h ****   dean [at] fourwalledcubicle [dot] com
+   6:../../LUFA/Drivers/Peripheral/Serial.h ****       www.fourwalledcubicle.com
+   7:../../LUFA/Drivers/Peripheral/Serial.h **** */
+   8:../../LUFA/Drivers/Peripheral/Serial.h **** 
+   9:../../LUFA/Drivers/Peripheral/Serial.h **** /*
+  10:../../LUFA/Drivers/Peripheral/Serial.h ****   Copyright 2010  Dean Camera (dean [at] fourwalledcubicle [dot] com)
+  11:../../LUFA/Drivers/Peripheral/Serial.h **** 
+  12:../../LUFA/Drivers/Peripheral/Serial.h ****   Permission to use, copy, modify, distribute, and sell this 
+  13:../../LUFA/Drivers/Peripheral/Serial.h ****   software and its documentation for any purpose is hereby granted
+  14:../../LUFA/Drivers/Peripheral/Serial.h ****   without fee, provided that the above copyright notice appear in 
+  15:../../LUFA/Drivers/Peripheral/Serial.h ****   all copies and that both that the copyright notice and this
+  16:../../LUFA/Drivers/Peripheral/Serial.h ****   permission notice and warranty disclaimer appear in supporting 
+  17:../../LUFA/Drivers/Peripheral/Serial.h ****   documentation, and that the name of the author not be used in 
+  18:../../LUFA/Drivers/Peripheral/Serial.h ****   advertising or publicity pertaining to distribution of the 
+  19:../../LUFA/Drivers/Peripheral/Serial.h ****   software without specific, written prior permission.
+  20:../../LUFA/Drivers/Peripheral/Serial.h **** 
+  21:../../LUFA/Drivers/Peripheral/Serial.h ****   The author disclaim all warranties with regard to this
+  22:../../LUFA/Drivers/Peripheral/Serial.h ****   software, including all implied warranties of merchantability
+  23:../../LUFA/Drivers/Peripheral/Serial.h ****   and fitness.  In no event shall the author be liable for any
+  24:../../LUFA/Drivers/Peripheral/Serial.h ****   special, indirect or consequential damages or any damages
+  25:../../LUFA/Drivers/Peripheral/Serial.h ****   whatsoever resulting from loss of use, data or profits, whether
+  26:../../LUFA/Drivers/Peripheral/Serial.h ****   in an action of contract, negligence or other tortious action,
+  27:../../LUFA/Drivers/Peripheral/Serial.h ****   arising out of or in connection with the use or performance of
+  28:../../LUFA/Drivers/Peripheral/Serial.h ****   this software.
+  29:../../LUFA/Drivers/Peripheral/Serial.h **** */
+  30:../../LUFA/Drivers/Peripheral/Serial.h **** 
+  31:../../LUFA/Drivers/Peripheral/Serial.h **** /** \file
+  32:../../LUFA/Drivers/Peripheral/Serial.h ****  *  \brief Master include file for the USART peripheral driver.
+  33:../../LUFA/Drivers/Peripheral/Serial.h ****  *
+  34:../../LUFA/Drivers/Peripheral/Serial.h ****  *  Driver for the USART subsystem on supported USB AVRs.
+  35:../../LUFA/Drivers/Peripheral/Serial.h ****  */
+  36:../../LUFA/Drivers/Peripheral/Serial.h ****  
+  37:../../LUFA/Drivers/Peripheral/Serial.h **** /** \ingroup Group_PeripheralDrivers
+  38:../../LUFA/Drivers/Peripheral/Serial.h ****  *  @defgroup Group_Serial Serial USART Driver - LUFA/Drivers/Peripheral/Serial.h
+  39:../../LUFA/Drivers/Peripheral/Serial.h ****  *
+  40:../../LUFA/Drivers/Peripheral/Serial.h ****  *  \section Sec_Dependencies Module Source Dependencies
+  41:../../LUFA/Drivers/Peripheral/Serial.h ****  *  The following files must be built with any user project that uses this module:
+  42:../../LUFA/Drivers/Peripheral/Serial.h ****  *    - LUFA/Drivers/Peripheral/Serial.c <i>(Makefile source module name: LUFA_SRC_SERIAL)</i>
+  43:../../LUFA/Drivers/Peripheral/Serial.h ****  *
+  44:../../LUFA/Drivers/Peripheral/Serial.h ****  *  \section Module Description
+  45:../../LUFA/Drivers/Peripheral/Serial.h ****  *  Hardware serial USART driver. This module provides an easy to use driver for
+  46:../../LUFA/Drivers/Peripheral/Serial.h ****  *  the setup of and transfer of data over the AVR's USART port.
+  47:../../LUFA/Drivers/Peripheral/Serial.h ****  *
+  48:../../LUFA/Drivers/Peripheral/Serial.h ****  *  @{
+  49:../../LUFA/Drivers/Peripheral/Serial.h ****  */
+  50:../../LUFA/Drivers/Peripheral/Serial.h ****  
+  51:../../LUFA/Drivers/Peripheral/Serial.h **** #ifndef __SERIAL_H__
+  52:../../LUFA/Drivers/Peripheral/Serial.h **** #define __SERIAL_H__
+  53:../../LUFA/Drivers/Peripheral/Serial.h **** 
+  54:../../LUFA/Drivers/Peripheral/Serial.h **** 	/* Includes: */
+  55:../../LUFA/Drivers/Peripheral/Serial.h **** 		#include <avr/io.h>
+  56:../../LUFA/Drivers/Peripheral/Serial.h **** 		#include <avr/pgmspace.h>
+  57:../../LUFA/Drivers/Peripheral/Serial.h **** 		#include <stdbool.h>
+  58:../../LUFA/Drivers/Peripheral/Serial.h **** 		
+  59:../../LUFA/Drivers/Peripheral/Serial.h **** 		#include "../../Common/Common.h"
+  60:../../LUFA/Drivers/Peripheral/Serial.h **** 		#include "../Misc/TerminalCodes.h"
+  61:../../LUFA/Drivers/Peripheral/Serial.h **** 
+  62:../../LUFA/Drivers/Peripheral/Serial.h **** 	/* Enable C linkage for C++ Compilers: */
+  63:../../LUFA/Drivers/Peripheral/Serial.h **** 		#if defined(__cplusplus)
+  64:../../LUFA/Drivers/Peripheral/Serial.h **** 			extern "C" {
+  65:../../LUFA/Drivers/Peripheral/Serial.h **** 		#endif
+  66:../../LUFA/Drivers/Peripheral/Serial.h **** 
+  67:../../LUFA/Drivers/Peripheral/Serial.h **** 	/* Public Interface - May be used in end-application: */
+  68:../../LUFA/Drivers/Peripheral/Serial.h **** 		/* Macros: */
+  69:../../LUFA/Drivers/Peripheral/Serial.h **** 			/** Macro for calculating the baud value from a given baud rate when the U2X (double speed) bit 
+  70:../../LUFA/Drivers/Peripheral/Serial.h **** 			 *  not set.
+  71:../../LUFA/Drivers/Peripheral/Serial.h **** 			 */
+  72:../../LUFA/Drivers/Peripheral/Serial.h **** 			#define SERIAL_UBBRVAL(baud)    ((((F_CPU / 16) + (baud / 2)) / (baud)) - 1)
+  73:../../LUFA/Drivers/Peripheral/Serial.h **** 
+  74:../../LUFA/Drivers/Peripheral/Serial.h **** 			/** Macro for calculating the baud value from a given baud rate when the U2X (double speed) bit 
+  75:../../LUFA/Drivers/Peripheral/Serial.h **** 			 *  set.
+  76:../../LUFA/Drivers/Peripheral/Serial.h **** 			 */
+  77:../../LUFA/Drivers/Peripheral/Serial.h **** 			#define SERIAL_2X_UBBRVAL(baud) ((((F_CPU / 8) + (baud / 2)) / (baud)) - 1)
+  78:../../LUFA/Drivers/Peripheral/Serial.h **** 
+  79:../../LUFA/Drivers/Peripheral/Serial.h **** 		/* Function Prototypes: */
+  80:../../LUFA/Drivers/Peripheral/Serial.h **** 			/** Transmits a given string located in program space (FLASH) through the USART.
+  81:../../LUFA/Drivers/Peripheral/Serial.h **** 			 *
+  82:../../LUFA/Drivers/Peripheral/Serial.h **** 			 *  \param[in] FlashStringPtr  Pointer to a string located in program space.
+  83:../../LUFA/Drivers/Peripheral/Serial.h **** 			 */
+  84:../../LUFA/Drivers/Peripheral/Serial.h **** 			void Serial_TxString_P(const char* FlashStringPtr) ATTR_NON_NULL_PTR_ARG(1);
+  85:../../LUFA/Drivers/Peripheral/Serial.h **** 
+  86:../../LUFA/Drivers/Peripheral/Serial.h **** 			/** Transmits a given string located in SRAM memory through the USART.
+  87:../../LUFA/Drivers/Peripheral/Serial.h **** 			 *
+  88:../../LUFA/Drivers/Peripheral/Serial.h **** 			 *  \param[in] StringPtr  Pointer to a string located in SRAM space.
+  89:../../LUFA/Drivers/Peripheral/Serial.h **** 			 */
+  90:../../LUFA/Drivers/Peripheral/Serial.h **** 			void Serial_TxString(const char* StringPtr) ATTR_NON_NULL_PTR_ARG(1);
+  91:../../LUFA/Drivers/Peripheral/Serial.h **** 
+  92:../../LUFA/Drivers/Peripheral/Serial.h **** 		/* Inline Functions: */
+  93:../../LUFA/Drivers/Peripheral/Serial.h **** 			/** Initializes the USART, ready for serial data transmission and reception. This initializes th
+  94:../../LUFA/Drivers/Peripheral/Serial.h **** 			 *  standard 8-bit, no parity, 1 stop bit settings suitable for most applications.
+  95:../../LUFA/Drivers/Peripheral/Serial.h **** 			 *
+  96:../../LUFA/Drivers/Peripheral/Serial.h **** 			 *  \param[in] BaudRate     Serial baud rate, in bits per second.
+  97:../../LUFA/Drivers/Peripheral/Serial.h **** 			 *  \param[in] DoubleSpeed  Enables double speed mode when set, halving the sample time to doubl
+  98:../../LUFA/Drivers/Peripheral/Serial.h **** 			 */
+  99:../../LUFA/Drivers/Peripheral/Serial.h **** 			static inline void Serial_Init(const uint32_t BaudRate,
+ 100:../../LUFA/Drivers/Peripheral/Serial.h **** 			                               const bool DoubleSpeed)
+ 101:../../LUFA/Drivers/Peripheral/Serial.h **** 			{
+ 102:../../LUFA/Drivers/Peripheral/Serial.h **** 				UBRR1  = (DoubleSpeed ? SERIAL_2X_UBBRVAL(BaudRate) : SERIAL_UBBRVAL(BaudRate));
+  85               		.loc 3 102 0
+  86 002e 8CEC      		ldi r24,lo8(-52)
+  87 0030 A82E      		mov r10,r24
+  88 0032 B12C      		mov r11,__zero_reg__
+  89 0034 87E6      		ldi r24,lo8(103)
+  90 0036 90E0      		ldi r25,0
+  91 0038 F501      		movw r30,r10
+  92 003a 9183      		std Z+1,r25
+  93 003c 8083      		st Z,r24
+ 103:../../LUFA/Drivers/Peripheral/Serial.h **** 
+ 104:../../LUFA/Drivers/Peripheral/Serial.h **** 				UCSR1C = ((1 << UCSZ11) | (1 << UCSZ10));
+  94               		.loc 3 104 0
+  95 003e 9AEC      		ldi r25,lo8(-54)
+  96 0040 E92E      		mov r14,r25
+  97 0042 F12C      		mov r15,__zero_reg__
+  98 0044 26E0      		ldi r18,lo8(6)
+  99 0046 D22E      		mov r13,r18
+ 100 0048 F701      		movw r30,r14
+ 101 004a D082      		st Z,r13
+ 105:../../LUFA/Drivers/Peripheral/Serial.h **** 				UCSR1A = (DoubleSpeed ? (1 << U2X1) : 0);
+ 102               		.loc 3 105 0
+ 103 004c 08EC      		ldi r16,lo8(-56)
+ 104 004e 10E0      		ldi r17,0
+ 105 0050 F801      		movw r30,r16
+ 106 0052 1082      		st Z,__zero_reg__
+ 106:../../LUFA/Drivers/Peripheral/Serial.h **** 				UCSR1B = ((1 << TXEN1)  | (1 << RXEN1));
+ 107               		.loc 3 106 0
+ 108 0054 C9EC      		ldi r28,lo8(-55)
+ 109 0056 D0E0      		ldi r29,0
+ 110 0058 88E1      		ldi r24,lo8(24)
+ 111 005a 8883      		st Y,r24
+ 107:../../LUFA/Drivers/Peripheral/Serial.h **** 				
+ 108:../../LUFA/Drivers/Peripheral/Serial.h **** 				DDRD  |= (1 << 3);
+ 112               		.loc 3 108 0
+ 113 005c 539A      		sbi 0xa,3
+ 109:../../LUFA/Drivers/Peripheral/Serial.h **** 				PORTD |= (1 << 2);
+ 114               		.loc 3 109 0
+ 115 005e 5A9A      		sbi 0xb,2
+ 116               	.LVL1:
+ 117               	.LBE63:
+ 118               	.LBE62:
+ 127:Arduino-keyboard.c **** 	wdt_disable();
+ 128:Arduino-keyboard.c **** 
+ 129:Arduino-keyboard.c **** 	/* Hardware Initialization */
+ 130:Arduino-keyboard.c **** 	Serial_Init(9600, false);
+ 131:Arduino-keyboard.c **** 	USB_Init();
+ 119               		.loc 1 131 0
+ 120 0060 0E94 0000 		call USB_Init
+ 121               	.LVL2:
+ 132:Arduino-keyboard.c **** 
+ 133:Arduino-keyboard.c **** 	/* Start the flush timer so that overflows occur rapidly to push received bytes to the USB interfa
+ 134:Arduino-keyboard.c **** 	TCCR0B = (1 << CS02);
+ 122               		.loc 1 134 0
+ 123 0064 84E0      		ldi r24,lo8(4)
+ 124 0066 85BD      		out 0x25,r24
+ 135:Arduino-keyboard.c **** 	
+ 136:Arduino-keyboard.c **** 	/* Pull target /RESET line high */
+ 137:Arduino-keyboard.c **** 	AVR_RESET_LINE_PORT |= AVR_RESET_LINE_MASK;
+ 125               		.loc 1 137 0
+ 126 0068 5F9A      		sbi 0xb,7
+ 138:Arduino-keyboard.c **** 	AVR_RESET_LINE_DDR  |= AVR_RESET_LINE_MASK;
+ 127               		.loc 1 138 0
+ 128 006a 579A      		sbi 0xa,7
+ 139:Arduino-keyboard.c **** 
+ 140:Arduino-keyboard.c **** 	/* Must turn off USART before reconfiguring it, otherwise incorrect operation may occur */
+ 141:Arduino-keyboard.c **** 	UCSR1B = 0;
+ 129               		.loc 1 141 0
+ 130 006c 1882      		st Y,__zero_reg__
+ 142:Arduino-keyboard.c **** 	UCSR1A = 0;
+ 131               		.loc 1 142 0
+ 132 006e F801      		movw r30,r16
+ 133 0070 1082      		st Z,__zero_reg__
+ 143:Arduino-keyboard.c **** 	UCSR1C = 0;
+ 134               		.loc 1 143 0
+ 135 0072 F701      		movw r30,r14
+ 136 0074 1082      		st Z,__zero_reg__
+ 144:Arduino-keyboard.c **** 
+ 145:Arduino-keyboard.c **** 	/* Special case 57600 baud for compatibility with the ATmega328 bootloader. */	
+ 146:Arduino-keyboard.c **** 	UBRR1  = SERIAL_2X_UBBRVAL(9600);
+ 137               		.loc 1 146 0
+ 138 0076 8FEC      		ldi r24,lo8(-49)
+ 139 0078 90E0      		ldi r25,0
+ 140 007a F501      		movw r30,r10
+ 141 007c 9183      		std Z+1,r25
+ 142 007e 8083      		st Z,r24
+ 147:Arduino-keyboard.c **** 
+ 148:Arduino-keyboard.c **** 	UCSR1C = ((1 << UCSZ11) | (1 << UCSZ10));
+ 143               		.loc 1 148 0
+ 144 0080 F701      		movw r30,r14
+ 145 0082 D082      		st Z,r13
+ 149:Arduino-keyboard.c **** 	UCSR1A = (1 << U2X1);
+ 146               		.loc 1 149 0
+ 147 0084 82E0      		ldi r24,lo8(2)
+ 148 0086 F801      		movw r30,r16
+ 149 0088 8083      		st Z,r24
+ 150:Arduino-keyboard.c **** 	UCSR1B = ((1 << RXCIE1) | (1 << TXEN1) | (1 << RXEN1));
+ 150               		.loc 1 150 0
+ 151 008a 88E9      		ldi r24,lo8(-104)
+ 152 008c 8883      		st Y,r24
+ 153               	/* epilogue start */
+ 151:Arduino-keyboard.c **** }
+ 154               		.loc 1 151 0
+ 155 008e DF91      		pop r29
+ 156 0090 CF91      		pop r28
+ 157 0092 1F91      		pop r17
+ 158 0094 0F91      		pop r16
+ 159 0096 FF90      		pop r15
+ 160 0098 EF90      		pop r14
+ 161 009a DF90      		pop r13
+ 162 009c BF90      		pop r11
+ 163 009e AF90      		pop r10
+ 164 00a0 0895      		ret
+ 165               		.cfi_endproc
+ 166               	.LFE91:
+ 168               		.section	.text.startup.main,"ax",@progbits
+ 169               	.global	main
+ 171               	main:
+ 172               	.LFB90:
+ 108:Arduino-keyboard.c **** 	SetupHardware();
+ 173               		.loc 1 108 0
+ 174               		.cfi_startproc
+ 175               	/* prologue: function */
+ 176               	/* frame size = 0 */
+ 177               	/* stack size = 0 */
+ 178               	.L__stack_usage = 0
+ 109:Arduino-keyboard.c **** 
+ 179               		.loc 1 109 0
+ 180 0000 0E94 0000 		call SetupHardware
+ 181               	.LVL3:
+ 182               	.LBB71:
+ 183               	.LBB72:
+ 184               		.file 4 "Lib/LightweightRingBuff.h"
+   1:Lib/LightweightRingBuff.h **** /*
+   2:Lib/LightweightRingBuff.h ****              LUFA Library
+   3:Lib/LightweightRingBuff.h ****      Copyright (C) Dean Camera, 2010.
+   4:Lib/LightweightRingBuff.h ****               
+   5:Lib/LightweightRingBuff.h ****   dean [at] fourwalledcubicle [dot] com
+   6:Lib/LightweightRingBuff.h ****       www.fourwalledcubicle.com
+   7:Lib/LightweightRingBuff.h **** */
+   8:Lib/LightweightRingBuff.h **** 
+   9:Lib/LightweightRingBuff.h **** /*
+  10:Lib/LightweightRingBuff.h ****   Copyright 2010  Dean Camera (dean [at] fourwalledcubicle [dot] com)
+  11:Lib/LightweightRingBuff.h **** 
+  12:Lib/LightweightRingBuff.h ****   Permission to use, copy, modify, distribute, and sell this 
+  13:Lib/LightweightRingBuff.h ****   software and its documentation for any purpose is hereby granted
+  14:Lib/LightweightRingBuff.h ****   without fee, provided that the above copyright notice appear in 
+  15:Lib/LightweightRingBuff.h ****   all copies and that both that the copyright notice and this
+  16:Lib/LightweightRingBuff.h ****   permission notice and warranty disclaimer appear in supporting 
+  17:Lib/LightweightRingBuff.h ****   documentation, and that the name of the author not be used in 
+  18:Lib/LightweightRingBuff.h ****   advertising or publicity pertaining to distribution of the 
+  19:Lib/LightweightRingBuff.h ****   software without specific, written prior permission.
+  20:Lib/LightweightRingBuff.h **** 
+  21:Lib/LightweightRingBuff.h ****   The author disclaim all warranties with regard to this
+  22:Lib/LightweightRingBuff.h ****   software, including all implied warranties of merchantability
+  23:Lib/LightweightRingBuff.h ****   and fitness.  In no event shall the author be liable for any
+  24:Lib/LightweightRingBuff.h ****   special, indirect or consequential damages or any damages
+  25:Lib/LightweightRingBuff.h ****   whatsoever resulting from loss of use, data or profits, whether
+  26:Lib/LightweightRingBuff.h ****   in an action of contract, negligence or other tortious action,
+  27:Lib/LightweightRingBuff.h ****   arising out of or in connection with the use or performance of
+  28:Lib/LightweightRingBuff.h ****   this software.
+  29:Lib/LightweightRingBuff.h **** */
+  30:Lib/LightweightRingBuff.h **** 
+  31:Lib/LightweightRingBuff.h **** /** \file
+  32:Lib/LightweightRingBuff.h ****  *
+  33:Lib/LightweightRingBuff.h ****  *  Ultra lightweight ring buffer, for fast insertion/deletion.
+  34:Lib/LightweightRingBuff.h ****  */
+  35:Lib/LightweightRingBuff.h ****  
+  36:Lib/LightweightRingBuff.h **** #ifndef _ULW_RING_BUFF_H_
+  37:Lib/LightweightRingBuff.h **** #define _ULW_RING_BUFF_H_
+  38:Lib/LightweightRingBuff.h **** 
+  39:Lib/LightweightRingBuff.h **** 	/* Includes: */
+  40:Lib/LightweightRingBuff.h **** 		#include <util/atomic.h>
+  41:Lib/LightweightRingBuff.h **** 	
+  42:Lib/LightweightRingBuff.h **** 		#include <stdint.h>
+  43:Lib/LightweightRingBuff.h **** 		#include <stdbool.h>
+  44:Lib/LightweightRingBuff.h **** 
+  45:Lib/LightweightRingBuff.h **** 	/* Defines: */
+  46:Lib/LightweightRingBuff.h **** 		/** Size of each ring buffer, in data elements - must be between 1 and 255. */
+  47:Lib/LightweightRingBuff.h **** 		#define BUFFER_SIZE         128
+  48:Lib/LightweightRingBuff.h **** 		
+  49:Lib/LightweightRingBuff.h **** 		/** Maximum number of data elements to buffer before forcing a flush. 
+  50:Lib/LightweightRingBuff.h **** 		 *  Must be less than BUFFER_SIZE
+  51:Lib/LightweightRingBuff.h **** 		 */
+  52:Lib/LightweightRingBuff.h **** 		#define BUFFER_NEARLY_FULL	96
+  53:Lib/LightweightRingBuff.h **** 		
+  54:Lib/LightweightRingBuff.h **** 		/** Type of data to store into the buffer. */
+  55:Lib/LightweightRingBuff.h **** 		#define RingBuff_Data_t     uint8_t
+  56:Lib/LightweightRingBuff.h **** 
+  57:Lib/LightweightRingBuff.h **** 		/** Datatype which may be used to store the count of data stored in a buffer, retrieved
+  58:Lib/LightweightRingBuff.h **** 		 *  via a call to \ref RingBuffer_GetCount().
+  59:Lib/LightweightRingBuff.h **** 		 */
+  60:Lib/LightweightRingBuff.h **** 		#if (BUFFER_SIZE <= 0xFF)
+  61:Lib/LightweightRingBuff.h **** 			#define RingBuff_Count_t   uint8_t
+  62:Lib/LightweightRingBuff.h **** 		#else
+  63:Lib/LightweightRingBuff.h **** 			#define RingBuff_Count_t   uint16_t
+  64:Lib/LightweightRingBuff.h **** 		#endif
+  65:Lib/LightweightRingBuff.h **** 
+  66:Lib/LightweightRingBuff.h **** 	/* Type Defines: */
+  67:Lib/LightweightRingBuff.h **** 		/** Type define for a new ring buffer object. Buffers should be initialized via a call to
+  68:Lib/LightweightRingBuff.h **** 		 *  \ref RingBuffer_InitBuffer() before use.
+  69:Lib/LightweightRingBuff.h **** 		 */
+  70:Lib/LightweightRingBuff.h **** 		typedef struct
+  71:Lib/LightweightRingBuff.h **** 		{
+  72:Lib/LightweightRingBuff.h **** 			RingBuff_Data_t  Buffer[BUFFER_SIZE]; /**< Internal ring buffer data, referenced by the buffer p
+  73:Lib/LightweightRingBuff.h **** 			RingBuff_Data_t* In; /**< Current storage location in the circular buffer */
+  74:Lib/LightweightRingBuff.h **** 			RingBuff_Data_t* Out; /**< Current retrieval location in the circular buffer */
+  75:Lib/LightweightRingBuff.h **** 			RingBuff_Count_t Count;
+  76:Lib/LightweightRingBuff.h **** 		} RingBuff_t;
+  77:Lib/LightweightRingBuff.h **** 	
+  78:Lib/LightweightRingBuff.h **** 	/* Inline Functions: */
+  79:Lib/LightweightRingBuff.h **** 		/** Initializes a ring buffer ready for use. Buffers must be initialized via this function
+  80:Lib/LightweightRingBuff.h **** 		 *  before any operations are called upon them. Already initialized buffers may be reset
+  81:Lib/LightweightRingBuff.h **** 		 *  by re-initializing them using this function.
+  82:Lib/LightweightRingBuff.h **** 		 *
+  83:Lib/LightweightRingBuff.h **** 		 *  \param[out] Buffer  Pointer to a ring buffer structure to initialize
+  84:Lib/LightweightRingBuff.h **** 		 */
+  85:Lib/LightweightRingBuff.h **** 		static inline void RingBuffer_InitBuffer(RingBuff_t* const Buffer)
+  86:Lib/LightweightRingBuff.h **** 		{
+  87:Lib/LightweightRingBuff.h **** 			ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+ 185               		.loc 4 87 0
+ 186 0004 2FB7      		in r18,__SREG__
+ 187               	.LVL4:
+ 188               	.LBB73:
+ 189               	.LBB74:
+ 190               		.file 5 "/usr/lib/avr/include/util/atomic.h"
+   1:/usr/lib/avr/include/util/atomic.h **** /* Copyright (c) 2007 Dean Camera
+   2:/usr/lib/avr/include/util/atomic.h ****    All rights reserved.
+   3:/usr/lib/avr/include/util/atomic.h **** 
+   4:/usr/lib/avr/include/util/atomic.h ****    Redistribution and use in source and binary forms, with or without
+   5:/usr/lib/avr/include/util/atomic.h ****    modification, are permitted provided that the following conditions are met:
+   6:/usr/lib/avr/include/util/atomic.h **** 
+   7:/usr/lib/avr/include/util/atomic.h ****    * Redistributions of source code must retain the above copyright
+   8:/usr/lib/avr/include/util/atomic.h ****      notice, this list of conditions and the following disclaimer.
+   9:/usr/lib/avr/include/util/atomic.h **** 
+  10:/usr/lib/avr/include/util/atomic.h ****    * Redistributions in binary form must reproduce the above copyright
+  11:/usr/lib/avr/include/util/atomic.h ****      notice, this list of conditions and the following disclaimer in
+  12:/usr/lib/avr/include/util/atomic.h ****      the documentation and/or other materials provided with the
+  13:/usr/lib/avr/include/util/atomic.h ****      distribution.
+  14:/usr/lib/avr/include/util/atomic.h **** 
+  15:/usr/lib/avr/include/util/atomic.h ****    * Neither the name of the copyright holders nor the names of
+  16:/usr/lib/avr/include/util/atomic.h ****      contributors may be used to endorse or promote products derived
+  17:/usr/lib/avr/include/util/atomic.h ****      from this software without specific prior written permission.
+  18:/usr/lib/avr/include/util/atomic.h **** 
+  19:/usr/lib/avr/include/util/atomic.h ****   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  20:/usr/lib/avr/include/util/atomic.h ****   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  21:/usr/lib/avr/include/util/atomic.h ****   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  22:/usr/lib/avr/include/util/atomic.h ****   ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+  23:/usr/lib/avr/include/util/atomic.h ****   LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  24:/usr/lib/avr/include/util/atomic.h ****   CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  25:/usr/lib/avr/include/util/atomic.h ****   SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  26:/usr/lib/avr/include/util/atomic.h ****   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  27:/usr/lib/avr/include/util/atomic.h ****   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  28:/usr/lib/avr/include/util/atomic.h ****   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+  29:/usr/lib/avr/include/util/atomic.h ****   POSSIBILITY OF SUCH DAMAGE.
+  30:/usr/lib/avr/include/util/atomic.h **** */
+  31:/usr/lib/avr/include/util/atomic.h **** 
+  32:/usr/lib/avr/include/util/atomic.h **** /* $Id$ */
+  33:/usr/lib/avr/include/util/atomic.h **** 
+  34:/usr/lib/avr/include/util/atomic.h **** #ifndef _UTIL_ATOMIC_H_
+  35:/usr/lib/avr/include/util/atomic.h **** #define _UTIL_ATOMIC_H_ 1
+  36:/usr/lib/avr/include/util/atomic.h **** 
+  37:/usr/lib/avr/include/util/atomic.h **** #include <avr/io.h>
+  38:/usr/lib/avr/include/util/atomic.h **** #include <avr/interrupt.h>
+  39:/usr/lib/avr/include/util/atomic.h **** 
+  40:/usr/lib/avr/include/util/atomic.h **** #if !defined(__DOXYGEN__)
+  41:/usr/lib/avr/include/util/atomic.h **** /* Internal helper functions. */
+  42:/usr/lib/avr/include/util/atomic.h **** static __inline__ uint8_t __iSeiRetVal(void)
+  43:/usr/lib/avr/include/util/atomic.h **** {
+  44:/usr/lib/avr/include/util/atomic.h ****     sei();
+  45:/usr/lib/avr/include/util/atomic.h ****     return 1;
+  46:/usr/lib/avr/include/util/atomic.h **** }
+  47:/usr/lib/avr/include/util/atomic.h **** 
+  48:/usr/lib/avr/include/util/atomic.h **** static __inline__ uint8_t __iCliRetVal(void)
+  49:/usr/lib/avr/include/util/atomic.h **** {
+  50:/usr/lib/avr/include/util/atomic.h ****     cli();
+ 191               		.loc 5 50 0
+ 192               	/* #APP */
+ 193               	 ;  50 "/usr/lib/avr/include/util/atomic.h" 1
+ 194 0006 F894      		cli
+ 195               	 ;  0 "" 2
+ 196               	.LVL5:
+ 197               	/* #NOAPP */
+ 198               	.LBE74:
+ 199               	.LBE73:
+  88:Lib/LightweightRingBuff.h **** 			{
+  89:Lib/LightweightRingBuff.h **** 				Buffer->In  = Buffer->Buffer;
+ 200               		.loc 4 89 0
+ 201 0008 80E0      		ldi r24,lo8(USARTtoUSB_Buffer)
+ 202 000a 90E0      		ldi r25,hi8(USARTtoUSB_Buffer)
+ 203 000c 9093 0000 		sts USARTtoUSB_Buffer+128+1,r25
+ 204 0010 8093 0000 		sts USARTtoUSB_Buffer+128,r24
+  90:Lib/LightweightRingBuff.h **** 				Buffer->Out = Buffer->Buffer;
+ 205               		.loc 4 90 0
+ 206 0014 9093 0000 		sts USARTtoUSB_Buffer+130+1,r25
+ 207 0018 8093 0000 		sts USARTtoUSB_Buffer+130,r24
+ 208               	.LVL6:
+ 209               	.LBB75:
+ 210               	.LBB76:
+  51:/usr/lib/avr/include/util/atomic.h ****     return 1;
+  52:/usr/lib/avr/include/util/atomic.h **** }
+  53:/usr/lib/avr/include/util/atomic.h **** 
+  54:/usr/lib/avr/include/util/atomic.h **** static __inline__ void __iSeiParam(const uint8_t *__s)
+  55:/usr/lib/avr/include/util/atomic.h **** {
+  56:/usr/lib/avr/include/util/atomic.h ****     sei();
+  57:/usr/lib/avr/include/util/atomic.h ****     __asm__ volatile ("" ::: "memory");
+  58:/usr/lib/avr/include/util/atomic.h ****     (void)__s;
+  59:/usr/lib/avr/include/util/atomic.h **** }
+  60:/usr/lib/avr/include/util/atomic.h **** 
+  61:/usr/lib/avr/include/util/atomic.h **** static __inline__ void __iCliParam(const uint8_t *__s)
+  62:/usr/lib/avr/include/util/atomic.h **** {
+  63:/usr/lib/avr/include/util/atomic.h ****     cli();
+  64:/usr/lib/avr/include/util/atomic.h ****     __asm__ volatile ("" ::: "memory");
+  65:/usr/lib/avr/include/util/atomic.h ****     (void)__s;
+  66:/usr/lib/avr/include/util/atomic.h **** }
+  67:/usr/lib/avr/include/util/atomic.h **** 
+  68:/usr/lib/avr/include/util/atomic.h **** static __inline__ void __iRestore(const  uint8_t *__s)
+  69:/usr/lib/avr/include/util/atomic.h **** {
+  70:/usr/lib/avr/include/util/atomic.h ****     SREG = *__s;
+ 211               		.loc 5 70 0
+ 212 001c 2FBF      		out __SREG__,r18
+  71:/usr/lib/avr/include/util/atomic.h ****     __asm__ volatile ("" ::: "memory");
+ 213               		.loc 5 71 0
+ 214               	.LVL7:
+ 215               	.LBE76:
+ 216               	.LBE75:
+ 217               	.LBE72:
+ 218               	.LBE71:
+ 113:Arduino-keyboard.c **** 
+ 219               		.loc 1 113 0
+ 220               	/* #APP */
+ 221               	 ;  113 "Arduino-keyboard.c" 1
+ 222 001e 7894      		sei
+ 223               	 ;  0 "" 2
+ 224               	/* #NOAPP */
+ 225               	.L3:
+ 117:Arduino-keyboard.c **** 		USB_USBTask();
+ 226               		.loc 1 117 0 discriminator 1
+ 227 0020 80E0      		ldi r24,lo8(Keyboard_HID_Interface)
+ 228 0022 90E0      		ldi r25,hi8(Keyboard_HID_Interface)
+ 229 0024 0E94 0000 		call HID_Device_USBTask
+ 230               	.LVL8:
+ 118:Arduino-keyboard.c **** 	}
+ 231               		.loc 1 118 0 discriminator 1
+ 232 0028 0E94 0000 		call USB_USBTask
+ 233               	.LVL9:
+ 234 002c 00C0      		rjmp .L3
+ 235               		.cfi_endproc
+ 236               	.LFE90:
+ 238               		.section	.text.EVENT_USB_Device_Connect,"ax",@progbits
+ 239               	.global	EVENT_USB_Device_Connect
+ 241               	EVENT_USB_Device_Connect:
+ 242               	.LFB103:
+ 243               		.cfi_startproc
+ 244               	/* prologue: function */
+ 245               	/* frame size = 0 */
+ 246               	/* stack size = 0 */
+ 247               	.L__stack_usage = 0
+ 248 0000 0895      		ret
+ 249               		.cfi_endproc
+ 250               	.LFE103:
+ 252               		.section	.text.EVENT_USB_Device_Disconnect,"ax",@progbits
+ 253               	.global	EVENT_USB_Device_Disconnect
+ 255               	EVENT_USB_Device_Disconnect:
+ 256               	.LFB93:
+ 152:Arduino-keyboard.c **** 
+ 153:Arduino-keyboard.c **** /** Event handler for the library USB Connection event. */
+ 154:Arduino-keyboard.c **** void EVENT_USB_Device_Connect(void)
+ 155:Arduino-keyboard.c **** {
+ 156:Arduino-keyboard.c **** 	//LEDs_SetAllLEDs(LEDMASK_USB_ENUMERATING);
+ 157:Arduino-keyboard.c **** }
+ 158:Arduino-keyboard.c **** 
+ 159:Arduino-keyboard.c **** /** Event handler for the library USB Disconnection event. */
+ 160:Arduino-keyboard.c **** void EVENT_USB_Device_Disconnect(void)
+ 161:Arduino-keyboard.c **** {
+ 257               		.loc 1 161 0
+ 258               		.cfi_startproc
+ 259               	/* prologue: function */
+ 260               	/* frame size = 0 */
+ 261               	/* stack size = 0 */
+ 262               	.L__stack_usage = 0
+ 263 0000 0895      		ret
+ 264               		.cfi_endproc
+ 265               	.LFE93:
+ 267               		.section	.text.EVENT_USB_Device_ConfigurationChanged,"ax",@progbits
+ 268               	.global	EVENT_USB_Device_ConfigurationChanged
+ 270               	EVENT_USB_Device_ConfigurationChanged:
+ 271               	.LFB94:
+ 162:Arduino-keyboard.c **** 	//LEDs_SetAllLEDs(LEDMASK_USB_NOTREADY);
+ 163:Arduino-keyboard.c **** }
+ 164:Arduino-keyboard.c **** 
+ 165:Arduino-keyboard.c **** /** Event handler for the library USB Configuration Changed event. */
+ 166:Arduino-keyboard.c **** void EVENT_USB_Device_ConfigurationChanged(void)
+ 167:Arduino-keyboard.c **** {
+ 272               		.loc 1 167 0
+ 273               		.cfi_startproc
+ 274               	/* prologue: function */
+ 275               	/* frame size = 0 */
+ 276               	/* stack size = 0 */
+ 277               	.L__stack_usage = 0
+ 168:Arduino-keyboard.c **** 	//LEDs_SetAllLEDs(LEDMASK_USB_READY);
+ 169:Arduino-keyboard.c **** 
+ 170:Arduino-keyboard.c **** 	HID_Device_ConfigureEndpoints(&Keyboard_HID_Interface);
+ 278               		.loc 1 170 0
+ 279 0000 80E0      		ldi r24,lo8(Keyboard_HID_Interface)
+ 280 0002 90E0      		ldi r25,hi8(Keyboard_HID_Interface)
+ 281 0004 0E94 0000 		call HID_Device_ConfigureEndpoints
+ 282               	.LVL10:
+ 283               	.LBB77:
+ 284               	.LBB78:
+ 285               		.file 6 "../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h"
+   1:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** /*
+   2:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****              LUFA Library
+   3:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****      Copyright (C) Dean Camera, 2010.
+   4:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****               
+   5:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****   dean [at] fourwalledcubicle [dot] com
+   6:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****       www.fourwalledcubicle.com
+   7:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** */
+   8:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 
+   9:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** /*
+  10:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****   Copyright 2010  Dean Camera (dean [at] fourwalledcubicle [dot] com)
+  11:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 
+  12:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****   Permission to use, copy, modify, distribute, and sell this 
+  13:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****   software and its documentation for any purpose is hereby granted
+  14:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****   without fee, provided that the above copyright notice appear in 
+  15:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****   all copies and that both that the copyright notice and this
+  16:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****   permission notice and warranty disclaimer appear in supporting 
+  17:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****   documentation, and that the name of the author not be used in 
+  18:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****   advertising or publicity pertaining to distribution of the 
+  19:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****   software without specific, written prior permission.
+  20:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 
+  21:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****   The author disclaim all warranties with regard to this
+  22:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****   software, including all implied warranties of merchantability
+  23:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****   and fitness.  In no event shall the author be liable for any
+  24:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****   special, indirect or consequential damages or any damages
+  25:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****   whatsoever resulting from loss of use, data or profits, whether
+  26:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****   in an action of contract, negligence or other tortious action,
+  27:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****   arising out of or in connection with the use or performance of
+  28:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****   this software.
+  29:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** */
+  30:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 
+  31:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** /** \file
+  32:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****  *  \brief USB device mode definitions.
+  33:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****  *
+  34:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****  *  This file contains structures, function prototypes and macros related to USB device mode.
+  35:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****  *
+  36:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****  *  \note This file should not be included directly. It is automatically included as needed by the 
+  37:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****  *        dispatch header located in LUFA/Drivers/USB/USB.h.
+  38:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****  */
+  39:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 
+  40:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** /** \ingroup Group_USB
+  41:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****  *  @defgroup Group_Device Device Management
+  42:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****  *
+  43:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****  *  USB Device mode related macros and enums. This module contains macros and enums which are used 
+  44:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****  *  the USB controller is initialized in device mode.
+  45:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****  *
+  46:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****  *  @{
+  47:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h ****  */
+  48:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 
+  49:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** #ifndef __USBDEVICE_H__
+  50:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** #define __USBDEVICE_H__
+  51:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 
+  52:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 	/* Includes: */
+  53:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 		#include <avr/io.h>
+  54:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 		#include <avr/pgmspace.h>
+  55:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 		#include <avr/eeprom.h>
+  56:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 
+  57:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 		#include "../../../Common/Common.h"	
+  58:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 		#include "../HighLevel/StdDescriptors.h"
+  59:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 		#include "USBInterrupt.h"
+  60:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 		#include "Endpoint.h"
+  61:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 
+  62:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 	/* Preprocessor Checks: */
+  63:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 		#if (defined(USE_RAM_DESCRIPTORS) && defined(USE_EEPROM_DESCRIPTORS))
+  64:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			#error USE_RAM_DESCRIPTORS and USE_EEPROM_DESCRIPTORS are mutually exclusive.
+  65:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 		#endif
+  66:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 
+  67:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 		#if !defined(__INCLUDE_FROM_USB_DRIVER)
+  68:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			#error Do not include this file directly. Include LUFA/Drivers/USB/USB.h instead.
+  69:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 		#endif
+  70:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			
+  71:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 	/* Public Interface - May be used in end-application: */
+  72:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 		/* Macros: */
+  73:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			#if defined(USB_SERIES_4_AVR) || defined(USB_SERIES_6_AVR) || defined(USB_SERIES_7_AVR) || defin
+  74:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				/** Mask for the Options parameter of the \ref USB_Init() function. This indicates that the
+  75:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				 *  USB interface should be initialized in low speed (1.5Mb/s) mode.
+  76:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				 *
+  77:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				 *  \note Low Speed mode is not available on all USB AVR models.
+  78:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				 *        \n\n
+  79:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				 *
+  80:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				 *  \note Restrictions apply on the number, size and type of endpoints which can be used
+  81:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				 *        when running in low speed mode -- refer to the USB 2.0 standard.
+  82:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				 */
+  83:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				#define USB_DEVICE_OPT_LOWSPEED            (1 << 0)
+  84:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			#endif
+  85:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			
+  86:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			/** Mask for the Options parameter of the \ref USB_Init() function. This indicates that the
+  87:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *  USB interface should be initialized in full speed (12Mb/s) mode.
+  88:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 */
+  89:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			#define USB_DEVICE_OPT_FULLSPEED               (0 << 0)
+  90:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 
+  91:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 		/* Function Prototypes: */
+  92:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			/** Sends a Remote Wakeup request to the host. This signals to the host that the device should
+  93:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *  be taken out of suspended mode, and communications should resume.
+  94:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *
+  95:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *  Typically, this is implemented so that HID devices (mice, keyboards, etc.) can wake up the
+  96:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *  host computer when the host has suspended all USB devices to enter a low power state.
+  97:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *
+  98:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *  \note This macro should only be used if the device has indicated to the host that it
+  99:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *        supports the Remote Wakeup feature in the device descriptors, and should only be
+ 100:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *        issued if the host is currently allowing remote wakeup events from the device (i.e.,
+ 101:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *        the \ref USB_RemoteWakeupEnabled flag is set). When the NO_DEVICE_REMOTE_WAKEUP compil
+ 102:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *        time option is used, this macro is unavailable.
+ 103:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *        \n
+ 104:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *
+ 105:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *  \note The USB clock must be running for this function to operate. If the stack is initialize
+ 106:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *        the \ref USB_OPT_MANUAL_PLL option enabled, the user must ensure that the PLL is runni
+ 107:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *        before attempting to call this function.
+ 108:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *
+ 109:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *  \see \ref Group_Descriptors for more information on the RMWAKEUP feature and device descript
+ 110:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 */
+ 111:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			void USB_Device_SendRemoteWakeup(void);
+ 112:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			
+ 113:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 		/* Type Defines: */
+ 114:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			enum USB_Device_States_t
+ 115:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			{
+ 116:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				DEVICE_STATE_Unattached                   = 0, /**< Internally implemented by the library. This
+ 117:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				                                                *   that the device is not currently connected 
+ 118:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				                                                */
+ 119:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				DEVICE_STATE_Powered                      = 1, /**< Internally implemented by the library. This
+ 120:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				                                                *   that the device is connected to a host, but
+ 121:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				                                                *   yet begun.
+ 122:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				                                                */
+ 123:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				DEVICE_STATE_Default                      = 2, /**< Internally implemented by the library. This
+ 124:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				                                                *   that the device's USB bus has been reset by
+ 125:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				                                                *   now waiting for the host to begin the enume
+ 126:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				                                                */
+ 127:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				DEVICE_STATE_Addressed                    = 3, /**< Internally implemented by the library. This
+ 128:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				                                                *   that the device has been addressed by the U
+ 129:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				                                                *   yet configured.
+ 130:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				                                                */
+ 131:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				DEVICE_STATE_Configured                   = 4, /**< May be implemented by the user project. Thi
+ 132:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				                                                *   that the device has been enumerated by the 
+ 133:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				                                                *   for USB communications to begin.
+ 134:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				                                                */
+ 135:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				DEVICE_STATE_Suspended                    = 5, /**< May be implemented by the user project. Thi
+ 136:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				                                                *   that the USB bus has been suspended by the 
+ 137:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				                                                *   should power down to a minimal power level 
+ 138:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				                                                *   resumed.
+ 139:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				                                                */
+ 140:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			};
+ 141:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			
+ 142:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 		/* Inline Functions: */
+ 143:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			/** Enables the device mode Start Of Frame events. When enabled, this causes the
+ 144:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *  \ref EVENT_USB_Device_StartOfFrame() event to fire once per millisecond, synchronized to the
+ 145:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 *  at the start of each USB frame when enumerated in device mode.
+ 146:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			 */
+ 147:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			static inline void USB_Device_EnableSOFEvents(void) ATTR_ALWAYS_INLINE;
+ 148:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			static inline void USB_Device_EnableSOFEvents(void)
+ 149:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 			{
+ 150:../../LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h **** 				USB_INT_Enable(USB_INT_SOFI);
+ 286               		.loc 6 150 0
+ 287 0008 E2EE      		ldi r30,lo8(-30)
+ 288 000a F0E0      		ldi r31,0
+ 289 000c 8081      		ld r24,Z
+ 290 000e 8460      		ori r24,lo8(4)
+ 291 0010 8083      		st Z,r24
+ 292 0012 0895      		ret
+ 293               	.LBE78:
+ 294               	.LBE77:
+ 295               		.cfi_endproc
+ 296               	.LFE94:
+ 298               		.section	.text.EVENT_USB_Device_UnhandledControlRequest,"ax",@progbits
+ 299               	.global	EVENT_USB_Device_UnhandledControlRequest
+ 301               	EVENT_USB_Device_UnhandledControlRequest:
+ 302               	.LFB95:
+ 171:Arduino-keyboard.c **** 
+ 172:Arduino-keyboard.c **** 	USB_Device_EnableSOFEvents();
+ 173:Arduino-keyboard.c **** }
+ 174:Arduino-keyboard.c **** 
+ 175:Arduino-keyboard.c **** /** Event handler for the library USB Unhandled Control Request event. */
+ 176:Arduino-keyboard.c **** void EVENT_USB_Device_UnhandledControlRequest(void)
+ 177:Arduino-keyboard.c **** {
+ 303               		.loc 1 177 0
+ 304               		.cfi_startproc
+ 305               	/* prologue: function */
+ 306               	/* frame size = 0 */
+ 307               	/* stack size = 0 */
+ 308               	.L__stack_usage = 0
+ 178:Arduino-keyboard.c **** 	HID_Device_ProcessControlRequest(&Keyboard_HID_Interface);
+ 309               		.loc 1 178 0
+ 310 0000 80E0      		ldi r24,lo8(Keyboard_HID_Interface)
+ 311 0002 90E0      		ldi r25,hi8(Keyboard_HID_Interface)
+ 312 0004 0C94 0000 		jmp HID_Device_ProcessControlRequest
+ 313               	.LVL11:
+ 314               		.cfi_endproc
+ 315               	.LFE95:
+ 317               		.section	.text.EVENT_USB_Device_StartOfFrame,"ax",@progbits
+ 318               	.global	EVENT_USB_Device_StartOfFrame
+ 320               	EVENT_USB_Device_StartOfFrame:
+ 321               	.LFB96:
+ 179:Arduino-keyboard.c **** }
+ 180:Arduino-keyboard.c **** 
+ 181:Arduino-keyboard.c **** /** Event handler for the USB device Start Of Frame event. */
+ 182:Arduino-keyboard.c **** void EVENT_USB_Device_StartOfFrame(void)
+ 183:Arduino-keyboard.c **** {
+ 322               		.loc 1 183 0
+ 323               		.cfi_startproc
+ 324               	/* prologue: function */
+ 325               	/* frame size = 0 */
+ 326               	/* stack size = 0 */
+ 327               	.L__stack_usage = 0
+ 328               	.LVL12:
+ 329               	.LBB79:
+ 330               	.LBB80:
+ 331               		.file 7 "../../LUFA/Drivers/USB/Class/Device/HID.h"
+   1:../../LUFA/Drivers/USB/Class/Device/HID.h **** /*
+   2:../../LUFA/Drivers/USB/Class/Device/HID.h ****              LUFA Library
+   3:../../LUFA/Drivers/USB/Class/Device/HID.h ****      Copyright (C) Dean Camera, 2010.
+   4:../../LUFA/Drivers/USB/Class/Device/HID.h ****               
+   5:../../LUFA/Drivers/USB/Class/Device/HID.h ****   dean [at] fourwalledcubicle [dot] com
+   6:../../LUFA/Drivers/USB/Class/Device/HID.h ****       www.fourwalledcubicle.com
+   7:../../LUFA/Drivers/USB/Class/Device/HID.h **** */
+   8:../../LUFA/Drivers/USB/Class/Device/HID.h **** 
+   9:../../LUFA/Drivers/USB/Class/Device/HID.h **** /*
+  10:../../LUFA/Drivers/USB/Class/Device/HID.h ****   Copyright 2010  Dean Camera (dean [at] fourwalledcubicle [dot] com)
+  11:../../LUFA/Drivers/USB/Class/Device/HID.h **** 
+  12:../../LUFA/Drivers/USB/Class/Device/HID.h ****   Permission to use, copy, modify, distribute, and sell this 
+  13:../../LUFA/Drivers/USB/Class/Device/HID.h ****   software and its documentation for any purpose is hereby granted
+  14:../../LUFA/Drivers/USB/Class/Device/HID.h ****   without fee, provided that the above copyright notice appear in 
+  15:../../LUFA/Drivers/USB/Class/Device/HID.h ****   all copies and that both that the copyright notice and this
+  16:../../LUFA/Drivers/USB/Class/Device/HID.h ****   permission notice and warranty disclaimer appear in supporting 
+  17:../../LUFA/Drivers/USB/Class/Device/HID.h ****   documentation, and that the name of the author not be used in 
+  18:../../LUFA/Drivers/USB/Class/Device/HID.h ****   advertising or publicity pertaining to distribution of the 
+  19:../../LUFA/Drivers/USB/Class/Device/HID.h ****   software without specific, written prior permission.
+  20:../../LUFA/Drivers/USB/Class/Device/HID.h **** 
+  21:../../LUFA/Drivers/USB/Class/Device/HID.h ****   The author disclaim all warranties with regard to this
+  22:../../LUFA/Drivers/USB/Class/Device/HID.h ****   software, including all implied warranties of merchantability
+  23:../../LUFA/Drivers/USB/Class/Device/HID.h ****   and fitness.  In no event shall the author be liable for any
+  24:../../LUFA/Drivers/USB/Class/Device/HID.h ****   special, indirect or consequential damages or any damages
+  25:../../LUFA/Drivers/USB/Class/Device/HID.h ****   whatsoever resulting from loss of use, data or profits, whether
+  26:../../LUFA/Drivers/USB/Class/Device/HID.h ****   in an action of contract, negligence or other tortious action,
+  27:../../LUFA/Drivers/USB/Class/Device/HID.h ****   arising out of or in connection with the use or performance of
+  28:../../LUFA/Drivers/USB/Class/Device/HID.h ****   this software.
+  29:../../LUFA/Drivers/USB/Class/Device/HID.h **** */
+  30:../../LUFA/Drivers/USB/Class/Device/HID.h **** 
+  31:../../LUFA/Drivers/USB/Class/Device/HID.h **** /** \file
+  32:../../LUFA/Drivers/USB/Class/Device/HID.h ****  *  \brief Device mode driver for the library USB HID Class driver.
+  33:../../LUFA/Drivers/USB/Class/Device/HID.h ****  *
+  34:../../LUFA/Drivers/USB/Class/Device/HID.h ****  *  Device mode driver for the library USB HID Class driver.
+  35:../../LUFA/Drivers/USB/Class/Device/HID.h ****  *
+  36:../../LUFA/Drivers/USB/Class/Device/HID.h ****  *  \note This file should not be included directly. It is automatically included as needed by the 
+  37:../../LUFA/Drivers/USB/Class/Device/HID.h ****  *        dispatch header located in LUFA/Drivers/USB/Class/HID.h.
+  38:../../LUFA/Drivers/USB/Class/Device/HID.h ****  */
+  39:../../LUFA/Drivers/USB/Class/Device/HID.h **** 
+  40:../../LUFA/Drivers/USB/Class/Device/HID.h **** /** \ingroup Group_USBClassHID
+  41:../../LUFA/Drivers/USB/Class/Device/HID.h ****  *  @defgroup Group_USBClassHIDDevice HID Class Device Mode Driver
+  42:../../LUFA/Drivers/USB/Class/Device/HID.h ****  *
+  43:../../LUFA/Drivers/USB/Class/Device/HID.h ****  *  \section Sec_Dependencies Module Source Dependencies
+  44:../../LUFA/Drivers/USB/Class/Device/HID.h ****  *  The following files must be built with any user project that uses this module:
+  45:../../LUFA/Drivers/USB/Class/Device/HID.h ****  *    - LUFA/Drivers/USB/Class/Device/HID.c <i>(Makefile source module name: LUFA_SRC_USBCLASS)</i>
+  46:../../LUFA/Drivers/USB/Class/Device/HID.h ****  *
+  47:../../LUFA/Drivers/USB/Class/Device/HID.h ****  *  \section Module Description
+  48:../../LUFA/Drivers/USB/Class/Device/HID.h ****  *  Device Mode USB Class driver framework interface, for the HID USB Class driver.
+  49:../../LUFA/Drivers/USB/Class/Device/HID.h ****  *
+  50:../../LUFA/Drivers/USB/Class/Device/HID.h ****  *  @{
+  51:../../LUFA/Drivers/USB/Class/Device/HID.h ****  */
+  52:../../LUFA/Drivers/USB/Class/Device/HID.h ****  
+  53:../../LUFA/Drivers/USB/Class/Device/HID.h **** #ifndef _HID_CLASS_DEVICE_H_
+  54:../../LUFA/Drivers/USB/Class/Device/HID.h **** #define _HID_CLASS_DEVICE_H_
+  55:../../LUFA/Drivers/USB/Class/Device/HID.h **** 
+  56:../../LUFA/Drivers/USB/Class/Device/HID.h **** 	/* Includes: */
+  57:../../LUFA/Drivers/USB/Class/Device/HID.h **** 		#include "../../USB.h"
+  58:../../LUFA/Drivers/USB/Class/Device/HID.h **** 		#include "../Common/HID.h"
+  59:../../LUFA/Drivers/USB/Class/Device/HID.h **** 
+  60:../../LUFA/Drivers/USB/Class/Device/HID.h **** 		#include <string.h>
+  61:../../LUFA/Drivers/USB/Class/Device/HID.h **** 
+  62:../../LUFA/Drivers/USB/Class/Device/HID.h **** 	/* Enable C linkage for C++ Compilers: */
+  63:../../LUFA/Drivers/USB/Class/Device/HID.h **** 		#if defined(__cplusplus)
+  64:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			extern "C" {
+  65:../../LUFA/Drivers/USB/Class/Device/HID.h **** 		#endif
+  66:../../LUFA/Drivers/USB/Class/Device/HID.h **** 
+  67:../../LUFA/Drivers/USB/Class/Device/HID.h **** 	/* Preprocessor Checks: */
+  68:../../LUFA/Drivers/USB/Class/Device/HID.h **** 		#if !defined(__INCLUDE_FROM_HID_DRIVER)
+  69:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			#error Do not include this file directly. Include LUFA/Drivers/Class/HID.h instead.
+  70:../../LUFA/Drivers/USB/Class/Device/HID.h **** 		#endif
+  71:../../LUFA/Drivers/USB/Class/Device/HID.h **** 
+  72:../../LUFA/Drivers/USB/Class/Device/HID.h **** 	/* Public Interface - May be used in end-application: */
+  73:../../LUFA/Drivers/USB/Class/Device/HID.h **** 		/* Type Defines: */
+  74:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			/** \brief HID Class Device Mode Configuration and State Structure.
+  75:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *
+  76:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  Class state structure. An instance of this structure should be made for each HID interface
+  77:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  within the user application, and passed to each of the HID class driver functions as the
+  78:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  HIDInterfaceInfo parameter. This stores each HID interface's configuration and state informa
+  79:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *
+  80:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \note Due to technical limitations, the HID device class driver does not utilize a separate 
+  81:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *        endpoint for host->device communications. Instead, the host->device data (if any) is s
+  82:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *        the device via the control endpoint.
+  83:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 */
+  84:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			typedef struct
+  85:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			{
+  86:../../LUFA/Drivers/USB/Class/Device/HID.h **** 				const struct
+  87:../../LUFA/Drivers/USB/Class/Device/HID.h **** 				{
+  88:../../LUFA/Drivers/USB/Class/Device/HID.h **** 					uint8_t  InterfaceNumber; /**< Interface number of the HID interface within the device. */
+  89:../../LUFA/Drivers/USB/Class/Device/HID.h **** 
+  90:../../LUFA/Drivers/USB/Class/Device/HID.h **** 					uint8_t  ReportINEndpointNumber; /**< Endpoint number of the HID interface's IN report endpoin
+  91:../../LUFA/Drivers/USB/Class/Device/HID.h **** 					uint16_t ReportINEndpointSize; /**< Size in bytes of the HID interface's IN report endpoint. *
+  92:../../LUFA/Drivers/USB/Class/Device/HID.h **** 					bool     ReportINEndpointDoubleBank; /**< Indicates if the HID interface's IN report endpoint 
+  93:../../LUFA/Drivers/USB/Class/Device/HID.h **** 					
+  94:../../LUFA/Drivers/USB/Class/Device/HID.h **** 					void*    PrevReportINBuffer; /**< Pointer to a buffer where the previously created HID input r
+  95:../../LUFA/Drivers/USB/Class/Device/HID.h **** 					                              *  stored by the driver, for comparison purposes to detect repor
+  96:../../LUFA/Drivers/USB/Class/Device/HID.h **** 					                              *  must be sent immediately to the host. This should point to a 
+  97:../../LUFA/Drivers/USB/Class/Device/HID.h **** 					                              *  to hold the largest HID input report sent from the HID interf
+  98:../../LUFA/Drivers/USB/Class/Device/HID.h **** 												  *  to NULL, it is up to the user to force transfers when needed in the 
+  99:../../LUFA/Drivers/USB/Class/Device/HID.h **** 												  *  \ref CALLBACK_HID_Device_CreateHIDReport() callback function.
+ 100:../../LUFA/Drivers/USB/Class/Device/HID.h **** 												  *
+ 101:../../LUFA/Drivers/USB/Class/Device/HID.h **** 												  *  \note Due to the single buffer, the internal driver can only correctly compare
+ 102:../../LUFA/Drivers/USB/Class/Device/HID.h **** 												  *        subsequent reports with identical report IDs. In multiple report devices,
+ 103:../../LUFA/Drivers/USB/Class/Device/HID.h **** 												  *        this buffer should be set to NULL and the decision to send reports made
+ 104:../../LUFA/Drivers/USB/Class/Device/HID.h **** 												  *        by the user application instead.
+ 105:../../LUFA/Drivers/USB/Class/Device/HID.h **** 					                              */
+ 106:../../LUFA/Drivers/USB/Class/Device/HID.h **** 					uint8_t  PrevReportINBufferSize; /**< Size in bytes of the given input report buffer. This is 
+ 107:../../LUFA/Drivers/USB/Class/Device/HID.h **** 					                                  *  second buffer of the same size within the driver so that 
+ 108:../../LUFA/Drivers/USB/Class/Device/HID.h **** 					                                  *  can be compared. If the user app is to determine when rep
+ 109:../../LUFA/Drivers/USB/Class/Device/HID.h **** 					                                  *  exclusively (i.e. \ref PrevReportINBuffer is NULL) this v
+ 110:../../LUFA/Drivers/USB/Class/Device/HID.h **** 													  *  set to the size of the largest report the device can issue to the host.
+ 111:../../LUFA/Drivers/USB/Class/Device/HID.h **** 					                                  */
+ 112:../../LUFA/Drivers/USB/Class/Device/HID.h **** 				} Config; /**< Config data for the USB class interface within the device. All elements in this 
+ 113:../../LUFA/Drivers/USB/Class/Device/HID.h **** 				           *   <b>must</b> be set or the interface will fail to enumerate and operate correctly
+ 114:../../LUFA/Drivers/USB/Class/Device/HID.h **** 				           */										 
+ 115:../../LUFA/Drivers/USB/Class/Device/HID.h **** 				struct
+ 116:../../LUFA/Drivers/USB/Class/Device/HID.h **** 				{
+ 117:../../LUFA/Drivers/USB/Class/Device/HID.h **** 					bool     UsingReportProtocol; /**< Indicates if the HID interface is set to Boot or Report pro
+ 118:../../LUFA/Drivers/USB/Class/Device/HID.h **** 					uint16_t IdleCount; /**< Report idle period, in milliseconds, set by the host. */
+ 119:../../LUFA/Drivers/USB/Class/Device/HID.h **** 					uint16_t IdleMSRemaining; /**< Total number of milliseconds remaining before the idle period e
+ 120:../../LUFA/Drivers/USB/Class/Device/HID.h **** 											   *   should be decremented by the user application if non-zero each millisecond. */	
+ 121:../../LUFA/Drivers/USB/Class/Device/HID.h **** 				} State; /**< State data for the USB class interface within the device. All elements in this se
+ 122:../../LUFA/Drivers/USB/Class/Device/HID.h **** 				          *   are reset to their defaults when the interface is enumerated.
+ 123:../../LUFA/Drivers/USB/Class/Device/HID.h **** 				          */
+ 124:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			} USB_ClassInfo_HID_Device_t;
+ 125:../../LUFA/Drivers/USB/Class/Device/HID.h **** 	
+ 126:../../LUFA/Drivers/USB/Class/Device/HID.h **** 		/* Function Prototypes: */
+ 127:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			/** Configures the endpoints of a given HID interface, ready for use. This should be linked to t
+ 128:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \ref EVENT_USB_Device_ConfigurationChanged() event so that the endpoints are configured when
+ 129:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  containing the given HID interface is selected.
+ 130:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *
+ 131:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \param[in,out] HIDInterfaceInfo  Pointer to a structure containing a HID Class configuration
+ 132:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *
+ 133:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \return Boolean true if the endpoints were successfully configured, false otherwise.
+ 134:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 */
+ 135:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			bool HID_Device_ConfigureEndpoints(USB_ClassInfo_HID_Device_t* const HIDInterfaceInfo) ATTR_NON_
+ 136:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			
+ 137:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			/** Processes incoming control requests from the host, that are directed to the given HID class 
+ 138:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  linked to the library \ref EVENT_USB_Device_UnhandledControlRequest() event.
+ 139:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *
+ 140:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \param[in,out] HIDInterfaceInfo  Pointer to a structure containing a HID Class configuration
+ 141:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 */		
+ 142:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			void HID_Device_ProcessControlRequest(USB_ClassInfo_HID_Device_t* const HIDInterfaceInfo) ATTR_N
+ 143:../../LUFA/Drivers/USB/Class/Device/HID.h **** 
+ 144:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			/** General management task for a given HID class interface, required for the correct operation 
+ 145:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  be called frequently in the main program loop, before the master USB management task \ref US
+ 146:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *
+ 147:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \param[in,out] HIDInterfaceInfo  Pointer to a structure containing a HID Class configuration
+ 148:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 */
+ 149:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			void HID_Device_USBTask(USB_ClassInfo_HID_Device_t* const HIDInterfaceInfo) ATTR_NON_NULL_PTR_AR
+ 150:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			
+ 151:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			/** HID class driver callback for the user creation of a HID IN report. This callback may fire i
+ 152:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  HID class control requests from the host, or by the normal HID endpoint polling procedure. I
+ 153:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  user is responsible for the creation of the next HID input report to be sent to the host.
+ 154:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *
+ 155:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \param[in,out] HIDInterfaceInfo  Pointer to a structure containing a HID Class configuration
+ 156:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \param[in,out] ReportID          If preset to a non-zero value, this is the report ID being 
+ 157:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *                                   this should be set to the report ID of the generated HID in
+ 158:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *                                   reports are not sent via the given HID interface, this para
+ 159:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \param[in]     ReportType        Type of HID report to generate, either \ref REPORT_ITEM_TYP
+ 160:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \param[out]    ReportData        Pointer to a buffer where the generated HID report should b
+ 161:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \param[out]    ReportSize        Number of bytes in the generated input report, or zero if n
+ 162:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *
+ 163:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \return Boolean true to force the sending of the report even if it is identical to the previ
+ 164:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *          the idle period (useful for devices which report relative movement), false otherwise
+ 165:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 */
+ 166:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			bool CALLBACK_HID_Device_CreateHIDReport(USB_ClassInfo_HID_Device_t* const HIDInterfaceInfo,
+ 167:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			                                         uint8_t* const ReportID,
+ 168:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			                                         const uint8_t ReportType,
+ 169:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			                                         void* ReportData,
+ 170:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			                                         uint16_t* const ReportSize) ATTR_NON_NULL_PTR_ARG(1)
+ 171:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			                                         ATTR_NON_NULL_PTR_ARG(2) ATTR_NON_NULL_PTR_ARG(4) ATTR_
+ 172:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			
+ 173:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			/** HID class driver callback for the user processing of a received HID OUT report. This callbac
+ 174:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  either HID class control requests from the host, or by the normal HID endpoint polling proce
+ 175:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  the user is responsible for the processing of the received HID output report from the host.
+ 176:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *
+ 177:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \param[in,out] HIDInterfaceInfo  Pointer to a structure containing a HID Class configuration
+ 178:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \param[in]     ReportID          Report ID of the received output report. If multiple report
+ 179:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *                                   interface, this parameter should be ignored.
+ 180:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \param[in]     ReportType        Type of received HID report, either \ref REPORT_ITEM_TYPE_O
+ 181:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \param[in]     ReportData        Pointer to a buffer where the received HID report is stored
+ 182:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \param[in]     ReportSize        Size in bytes of the received report from the host.
+ 183:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 */
+ 184:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			void CALLBACK_HID_Device_ProcessHIDReport(USB_ClassInfo_HID_Device_t* const HIDInterfaceInfo,
+ 185:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			                                          const uint8_t ReportID,
+ 186:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			                                          const uint8_t ReportType,
+ 187:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			                                          const void* ReportData,
+ 188:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			                                          const uint16_t ReportSize) ATTR_NON_NULL_PTR_ARG(1) AT
+ 189:../../LUFA/Drivers/USB/Class/Device/HID.h **** 
+ 190:../../LUFA/Drivers/USB/Class/Device/HID.h **** 		/* Inline Functions: */
+ 191:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			/** Indicates that a millisecond of idle time has elapsed on the given HID interface, and the in
+ 192:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  decremented. This should be called once per millisecond so that hardware key-repeats functio
+ 193:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  that this be called by the \ref EVENT_USB_Device_StartOfFrame() event, once SOF events have 
+ 194:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \ref USB_Device_EnableSOFEvents().
+ 195:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *
+ 196:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 *  \param[in,out] HIDInterfaceInfo  Pointer to a structure containing a HID Class configuration
+ 197:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			 */
+ 198:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			static inline void HID_Device_MillisecondElapsed(USB_ClassInfo_HID_Device_t* const HIDInterfaceI
+ 199:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			static inline void HID_Device_MillisecondElapsed(USB_ClassInfo_HID_Device_t* const HIDInterfaceI
+ 200:../../LUFA/Drivers/USB/Class/Device/HID.h **** 			{
+ 201:../../LUFA/Drivers/USB/Class/Device/HID.h **** 				if (HIDInterfaceInfo->State.IdleMSRemaining)
+ 332               		.loc 7 201 0
+ 333 0000 8091 0000 		lds r24,Keyboard_HID_Interface+11
+ 334 0004 9091 0000 		lds r25,Keyboard_HID_Interface+11+1
+ 335 0008 0097      		sbiw r24,0
+ 336 000a 01F0      		breq .L9
+ 202:../../LUFA/Drivers/USB/Class/Device/HID.h **** 				  HIDInterfaceInfo->State.IdleMSRemaining--;
+ 337               		.loc 7 202 0
+ 338 000c 0197      		sbiw r24,1
+ 339 000e 9093 0000 		sts Keyboard_HID_Interface+11+1,r25
+ 340 0012 8093 0000 		sts Keyboard_HID_Interface+11,r24
+ 341               	.LVL13:
+ 342               	.L9:
+ 343 0016 0895      		ret
+ 344               	.LBE80:
+ 345               	.LBE79:
+ 346               		.cfi_endproc
+ 347               	.LFE96:
+ 349               		.section	.text.CALLBACK_HID_Device_CreateHIDReport,"ax",@progbits
+ 350               	.global	CALLBACK_HID_Device_CreateHIDReport
+ 352               	CALLBACK_HID_Device_CreateHIDReport:
+ 353               	.LFB97:
+ 184:Arduino-keyboard.c **** 	HID_Device_MillisecondElapsed(&Keyboard_HID_Interface);
+ 185:Arduino-keyboard.c **** }
+ 186:Arduino-keyboard.c **** 
+ 187:Arduino-keyboard.c **** /** HID class driver callback function for the creation of HID reports to the host.
+ 188:Arduino-keyboard.c ****  *
+ 189:Arduino-keyboard.c ****  *  \param[in]     HIDInterfaceInfo  Pointer to the HID class interface configuration structure bei
+ 190:Arduino-keyboard.c ****  *  \param[in,out] ReportID    Report ID requested by the host if non-zero, otherwise callback shou
+ 191:Arduino-keyboard.c ****  *  \param[in]     ReportType  Type of the report to create, either REPORT_ITEM_TYPE_In or REPORT_I
+ 192:Arduino-keyboard.c ****  *  \param[out]    ReportData  Pointer to a buffer where the created report should be stored
+ 193:Arduino-keyboard.c ****  *  \param[out]    ReportSize  Number of bytes written in the report (or zero if no report is to be
+ 194:Arduino-keyboard.c ****  *
+ 195:Arduino-keyboard.c ****  *  \return Boolean true to force the sending of the report, false to let the library determine if 
+ 196:Arduino-keyboard.c ****  */
+ 197:Arduino-keyboard.c **** bool CALLBACK_HID_Device_CreateHIDReport(
+ 198:Arduino-keyboard.c ****     USB_ClassInfo_HID_Device_t* const HIDInterfaceInfo,
+ 199:Arduino-keyboard.c ****     uint8_t* const ReportID,
+ 200:Arduino-keyboard.c ****     const uint8_t ReportType,
+ 201:Arduino-keyboard.c ****     void* ReportData,
+ 202:Arduino-keyboard.c ****     uint16_t* const ReportSize)
+ 203:Arduino-keyboard.c **** {
+ 354               		.loc 1 203 0
+ 355               		.cfi_startproc
+ 356               	.LVL14:
+ 357 0000 0F93      		push r16
+ 358               	.LCFI9:
+ 359               		.cfi_def_cfa_offset 3
+ 360               		.cfi_offset 16, -2
+ 361 0002 1F93      		push r17
+ 362               	.LCFI10:
+ 363               		.cfi_def_cfa_offset 4
+ 364               		.cfi_offset 17, -3
+ 365               	/* prologue: function */
+ 366               	/* frame size = 0 */
+ 367               	/* stack size = 2 */
+ 368               	.L__stack_usage = 2
+ 369               	.LVL15:
+ 370               	.LBB97:
+ 371               	.LBB98:
+ 372               	.LBB99:
+  91:Lib/LightweightRingBuff.h **** 			}
+  92:Lib/LightweightRingBuff.h **** 		}
+  93:Lib/LightweightRingBuff.h **** 		
+  94:Lib/LightweightRingBuff.h **** 		/** Retrieves the minimum number of bytes stored in a particular buffer. This value is computed
+  95:Lib/LightweightRingBuff.h **** 		 *  by entering an atomic lock on the buffer while the IN and OUT locations are fetched, so that
+  96:Lib/LightweightRingBuff.h **** 		 *  the buffer cannot be modified while the computation takes place. This value should be cached
+  97:Lib/LightweightRingBuff.h **** 		 *  when reading out the contents of the buffer, so that as small a time as possible is spent
+  98:Lib/LightweightRingBuff.h **** 		 *  in an atomic lock.
+  99:Lib/LightweightRingBuff.h **** 		 *
+ 100:Lib/LightweightRingBuff.h **** 		 *  \note The value returned by this function is guaranteed to only be the minimum number of byte
+ 101:Lib/LightweightRingBuff.h **** 		 *        stored in the given buffer; this value may change as other threads write new data and s
+ 102:Lib/LightweightRingBuff.h **** 		 *        the returned number should be used only to determine how many successive reads may safe
+ 103:Lib/LightweightRingBuff.h **** 		 *        be performed on the buffer.
+ 104:Lib/LightweightRingBuff.h **** 		 *
+ 105:Lib/LightweightRingBuff.h **** 		 *  \param[in] Buffer  Pointer to a ring buffer structure whose count is to be computed
+ 106:Lib/LightweightRingBuff.h **** 		 */
+ 107:Lib/LightweightRingBuff.h **** 		static inline RingBuff_Count_t RingBuffer_GetCount(RingBuff_t* const Buffer)
+ 108:Lib/LightweightRingBuff.h **** 		{
+ 109:Lib/LightweightRingBuff.h **** 			RingBuff_Count_t Count;
+ 110:Lib/LightweightRingBuff.h **** 			
+ 111:Lib/LightweightRingBuff.h **** 			ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+ 373               		.loc 4 111 0
+ 374 0004 9FB7      		in r25,__SREG__
+ 375               	.LVL16:
+ 376               	.LBB100:
+ 377               	.LBB101:
+  50:/usr/lib/avr/include/util/atomic.h ****     return 1;
+ 378               		.loc 5 50 0
+ 379               	/* #APP */
+ 380               	 ;  50 "/usr/lib/avr/include/util/atomic.h" 1
+ 381 0006 F894      		cli
+ 382               	 ;  0 "" 2
+ 383               	.LVL17:
+ 384               	/* #NOAPP */
+ 385               	.LBE101:
+ 386               	.LBE100:
+ 112:Lib/LightweightRingBuff.h **** 			{
+ 113:Lib/LightweightRingBuff.h **** 				Count = Buffer->Count;
+ 387               		.loc 4 113 0
+ 388 0008 8091 0000 		lds r24,USARTtoUSB_Buffer+132
+ 389               	.LVL18:
+ 390               	.LBB102:
+ 391               	.LBB103:
+  70:/usr/lib/avr/include/util/atomic.h ****     __asm__ volatile ("" ::: "memory");
+ 392               		.loc 5 70 0
+ 393 000c 9FBF      		out __SREG__,r25
+ 394               		.loc 5 71 0
+ 395               	.LVL19:
+ 396               	.LBE103:
+ 397               	.LBE102:
+ 398               	.LBE99:
+ 399               	.LBE98:
+ 400               	.LBE97:
+ 204:Arduino-keyboard.c **** 	uint8_t *datap = ReportData;
+ 205:Arduino-keyboard.c **** 	int ind;
+ 206:Arduino-keyboard.c **** 
+ 207:Arduino-keyboard.c **** 	RingBuff_Count_t BufferCount = RingBuffer_GetCount(&USARTtoUSB_Buffer);
+ 208:Arduino-keyboard.c **** 
+ 209:Arduino-keyboard.c **** 	if (BufferCount >= 8) {
+ 401               		.loc 1 209 0
+ 402 000e 8830      		cpi r24,lo8(8)
+ 403 0010 00F0      		brlo .L15
+ 404 0012 A0E0      		ldi r26,lo8(keyboardData)
+ 405 0014 B0E0      		ldi r27,hi8(keyboardData)
+ 406               	.LBB104:
+ 407               	.LBB105:
+ 114:Lib/LightweightRingBuff.h **** 			}
+ 115:Lib/LightweightRingBuff.h **** 			
+ 116:Lib/LightweightRingBuff.h **** 			return Count;
+ 117:Lib/LightweightRingBuff.h **** 		}
+ 118:Lib/LightweightRingBuff.h **** 		
+ 119:Lib/LightweightRingBuff.h **** 		/** Atomically determines if the specified ring buffer contains any free space. This should
+ 120:Lib/LightweightRingBuff.h **** 		 *  be tested before storing data to the buffer, to ensure that no data is lost due to a
+ 121:Lib/LightweightRingBuff.h **** 		 *  buffer overrun.
+ 122:Lib/LightweightRingBuff.h **** 		 *
+ 123:Lib/LightweightRingBuff.h **** 		 *  \param[in,out] Buffer  Pointer to a ring buffer structure to insert into
+ 124:Lib/LightweightRingBuff.h **** 		 *
+ 125:Lib/LightweightRingBuff.h **** 		 *  \return Boolean true if the buffer contains no free space, false otherwise
+ 126:Lib/LightweightRingBuff.h **** 		 */		 
+ 127:Lib/LightweightRingBuff.h **** 		static inline bool RingBuffer_IsFull(RingBuff_t* const Buffer)
+ 128:Lib/LightweightRingBuff.h **** 		{
+ 129:Lib/LightweightRingBuff.h **** 			return (RingBuffer_GetCount(Buffer) == BUFFER_SIZE);
+ 130:Lib/LightweightRingBuff.h **** 		}
+ 131:Lib/LightweightRingBuff.h **** 
+ 132:Lib/LightweightRingBuff.h **** 		/** Atomically determines if the specified ring buffer contains any data. This should
+ 133:Lib/LightweightRingBuff.h **** 		 *  be tested before removing data from the buffer, to ensure that the buffer does not
+ 134:Lib/LightweightRingBuff.h **** 		 *  underflow.
+ 135:Lib/LightweightRingBuff.h **** 		 *
+ 136:Lib/LightweightRingBuff.h **** 		 *  If the data is to be removed in a loop, store the total number of bytes stored in the
+ 137:Lib/LightweightRingBuff.h **** 		 *  buffer (via a call to the \ref RingBuffer_GetCount() function) in a temporary variable
+ 138:Lib/LightweightRingBuff.h **** 		 *  to reduce the time spent in atomicity locks.
+ 139:Lib/LightweightRingBuff.h **** 		 *
+ 140:Lib/LightweightRingBuff.h **** 		 *  \param[in,out] Buffer  Pointer to a ring buffer structure to insert into
+ 141:Lib/LightweightRingBuff.h **** 		 *
+ 142:Lib/LightweightRingBuff.h **** 		 *  \return Boolean true if the buffer contains no free space, false otherwise
+ 143:Lib/LightweightRingBuff.h **** 		 */		 
+ 144:Lib/LightweightRingBuff.h **** 		static inline bool RingBuffer_IsEmpty(RingBuff_t* const Buffer)
+ 145:Lib/LightweightRingBuff.h **** 		{
+ 146:Lib/LightweightRingBuff.h **** 			return (RingBuffer_GetCount(Buffer) == 0);
+ 147:Lib/LightweightRingBuff.h **** 		}
+ 148:Lib/LightweightRingBuff.h **** 
+ 149:Lib/LightweightRingBuff.h **** 		/** Inserts an element into the ring buffer.
+ 150:Lib/LightweightRingBuff.h **** 		 *
+ 151:Lib/LightweightRingBuff.h **** 		 *  \note Only one execution thread (main program thread or an ISR) may insert into a single buff
+ 152:Lib/LightweightRingBuff.h **** 		 *        otherwise data corruption may occur. Insertion and removal may occur from different exe
+ 153:Lib/LightweightRingBuff.h **** 		 *        threads.
+ 154:Lib/LightweightRingBuff.h **** 		 *
+ 155:Lib/LightweightRingBuff.h **** 		 *  \param[in,out] Buffer  Pointer to a ring buffer structure to insert into
+ 156:Lib/LightweightRingBuff.h **** 		 *  \param[in]     Data    Data element to insert into the buffer
+ 157:Lib/LightweightRingBuff.h **** 		 */
+ 158:Lib/LightweightRingBuff.h **** 		static inline void RingBuffer_Insert(RingBuff_t* const Buffer,
+ 159:Lib/LightweightRingBuff.h **** 		                                     const RingBuff_Data_t Data)
+ 160:Lib/LightweightRingBuff.h **** 		{
+ 161:Lib/LightweightRingBuff.h **** 			*Buffer->In = Data;
+ 162:Lib/LightweightRingBuff.h **** 			
+ 163:Lib/LightweightRingBuff.h **** 			if (++Buffer->In == &Buffer->Buffer[BUFFER_SIZE])
+ 164:Lib/LightweightRingBuff.h **** 			  Buffer->In = Buffer->Buffer;
+ 165:Lib/LightweightRingBuff.h **** 
+ 166:Lib/LightweightRingBuff.h **** 			ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+ 167:Lib/LightweightRingBuff.h **** 			{
+ 168:Lib/LightweightRingBuff.h **** 				Buffer->Count++;
+ 169:Lib/LightweightRingBuff.h **** 			}
+ 170:Lib/LightweightRingBuff.h **** 		}
+ 171:Lib/LightweightRingBuff.h **** 
+ 172:Lib/LightweightRingBuff.h **** 		/** Removes an element from the ring buffer.
+ 173:Lib/LightweightRingBuff.h **** 		 *
+ 174:Lib/LightweightRingBuff.h **** 		 *  \note Only one execution thread (main program thread or an ISR) may remove from a single buff
+ 175:Lib/LightweightRingBuff.h **** 		 *        otherwise data corruption may occur. Insertion and removal may occur from different exe
+ 176:Lib/LightweightRingBuff.h **** 		 *        threads.
+ 177:Lib/LightweightRingBuff.h **** 		 *
+ 178:Lib/LightweightRingBuff.h **** 		 *  \param[in,out] Buffer  Pointer to a ring buffer structure to retrieve from
+ 179:Lib/LightweightRingBuff.h **** 		 *
+ 180:Lib/LightweightRingBuff.h **** 		 *  \return Next data element stored in the buffer
+ 181:Lib/LightweightRingBuff.h **** 		 */
+ 182:Lib/LightweightRingBuff.h **** 		static inline RingBuff_Data_t RingBuffer_Remove(RingBuff_t* const Buffer)
+ 183:Lib/LightweightRingBuff.h **** 		{
+ 184:Lib/LightweightRingBuff.h **** 			RingBuff_Data_t Data = *Buffer->Out;
+ 408               		.loc 4 184 0
+ 409 0016 60E0      		ldi r22,lo8(USARTtoUSB_Buffer)
+ 410 0018 70E0      		ldi r23,hi8(USARTtoUSB_Buffer)
+ 411               	.LVL20:
+ 412               	.L17:
+ 413 001a E091 0000 		lds r30,USARTtoUSB_Buffer+130
+ 414 001e F091 0000 		lds r31,USARTtoUSB_Buffer+130+1
+ 415 0022 9191      		ld r25,Z+
+ 416               	.LVL21:
+ 185:Lib/LightweightRingBuff.h **** 			
+ 186:Lib/LightweightRingBuff.h **** 			if (++Buffer->Out == &Buffer->Buffer[BUFFER_SIZE])
+ 417               		.loc 4 186 0
+ 418 0024 F093 0000 		sts USARTtoUSB_Buffer+130+1,r31
+ 419 0028 E093 0000 		sts USARTtoUSB_Buffer+130,r30
+ 420 002c E050      		subi r30,lo8(USARTtoUSB_Buffer+128)
+ 421 002e F040      		sbci r31,hi8(USARTtoUSB_Buffer+128)
+ 422 0030 01F4      		brne .L16
+ 187:Lib/LightweightRingBuff.h **** 			  Buffer->Out = Buffer->Buffer;
+ 423               		.loc 4 187 0
+ 424 0032 7093 0000 		sts USARTtoUSB_Buffer+130+1,r23
+ 425 0036 6093 0000 		sts USARTtoUSB_Buffer+130,r22
+ 426               	.L16:
+ 427               	.LBB106:
+ 188:Lib/LightweightRingBuff.h **** 
+ 189:Lib/LightweightRingBuff.h **** 			ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+ 428               		.loc 4 189 0
+ 429 003a 4FB7      		in r20,__SREG__
+ 430               	.LVL22:
+ 431               	.LBB107:
+ 432               	.LBB108:
+  50:/usr/lib/avr/include/util/atomic.h ****     return 1;
+ 433               		.loc 5 50 0
+ 434               	/* #APP */
+ 435               	 ;  50 "/usr/lib/avr/include/util/atomic.h" 1
+ 436 003c F894      		cli
+ 437               	 ;  0 "" 2
+ 438               	.LVL23:
+ 439               	/* #NOAPP */
+ 440               	.LBE108:
+ 441               	.LBE107:
+ 190:Lib/LightweightRingBuff.h **** 			{
+ 191:Lib/LightweightRingBuff.h **** 				Buffer->Count--;
+ 442               		.loc 4 191 0
+ 443 003e 8091 0000 		lds r24,USARTtoUSB_Buffer+132
+ 444 0042 8150      		subi r24,lo8(-(-1))
+ 445 0044 8093 0000 		sts USARTtoUSB_Buffer+132,r24
+ 446               	.LVL24:
+ 447               	.LBB109:
+ 448               	.LBB110:
+  70:/usr/lib/avr/include/util/atomic.h ****     __asm__ volatile ("" ::: "memory");
+ 449               		.loc 5 70 0
+ 450 0048 4FBF      		out __SREG__,r20
+ 451               		.loc 5 71 0
+ 452               	.LVL25:
+ 453               	.LBE110:
+ 454               	.LBE109:
+ 455               	.LBE106:
+ 456               	.LBE105:
+ 457               	.LBE104:
+ 210:Arduino-keyboard.c **** 	    for (ind=0; ind<8; ind++) {
+ 211:Arduino-keyboard.c **** 		keyboardData[ind] = RingBuffer_Remove(&USARTtoUSB_Buffer);
+ 458               		.loc 1 211 0
+ 459 004a 9D93      		st X+,r25
+ 460               	.LVL26:
+ 210:Arduino-keyboard.c **** 	    for (ind=0; ind<8; ind++) {
+ 461               		.loc 1 210 0
+ 462 004c E0E0      		ldi r30,hi8(keyboardData+8)
+ 463 004e A030      		cpi r26,lo8(keyboardData+8)
+ 464 0050 BE07      		cpc r27,r30
+ 465 0052 01F4      		brne .L17
+ 212:Arduino-keyboard.c **** 	    }
+ 213:Arduino-keyboard.c **** 
+ 214:Arduino-keyboard.c **** 	    /* Send an led status byte back for every keyboard report received */
+ 215:Arduino-keyboard.c **** 	    Serial_TxByte(ledReport);
+ 466               		.loc 1 215 0
+ 467 0054 8091 0000 		lds r24,ledReport
+ 468               	.LVL27:
+ 469               	.L18:
+ 470               	.LBB111:
+ 471               	.LBB112:
+ 110:../../LUFA/Drivers/Peripheral/Serial.h **** 			}
+ 111:../../LUFA/Drivers/Peripheral/Serial.h **** 
+ 112:../../LUFA/Drivers/Peripheral/Serial.h **** 			/** Turns off the USART driver, disabling and returning used hardware to their default configura
+ 113:../../LUFA/Drivers/Peripheral/Serial.h **** 			static inline void Serial_ShutDown(void)
+ 114:../../LUFA/Drivers/Peripheral/Serial.h **** 			{
+ 115:../../LUFA/Drivers/Peripheral/Serial.h **** 				UCSR1B = 0;
+ 116:../../LUFA/Drivers/Peripheral/Serial.h **** 				UCSR1A = 0;
+ 117:../../LUFA/Drivers/Peripheral/Serial.h **** 				UCSR1C = 0;
+ 118:../../LUFA/Drivers/Peripheral/Serial.h **** 
+ 119:../../LUFA/Drivers/Peripheral/Serial.h **** 				UBRR1  = 0;
+ 120:../../LUFA/Drivers/Peripheral/Serial.h **** 				
+ 121:../../LUFA/Drivers/Peripheral/Serial.h **** 				DDRD  &= ~(1 << 3);
+ 122:../../LUFA/Drivers/Peripheral/Serial.h **** 				PORTD &= ~(1 << 2);
+ 123:../../LUFA/Drivers/Peripheral/Serial.h **** 			}
+ 124:../../LUFA/Drivers/Peripheral/Serial.h **** 
+ 125:../../LUFA/Drivers/Peripheral/Serial.h **** 			/** Indicates whether a character has been received through the USART.
+ 126:../../LUFA/Drivers/Peripheral/Serial.h **** 			 *
+ 127:../../LUFA/Drivers/Peripheral/Serial.h **** 			 *  \return Boolean true if a character has been received, false otherwise.
+ 128:../../LUFA/Drivers/Peripheral/Serial.h **** 			 */
+ 129:../../LUFA/Drivers/Peripheral/Serial.h **** 			static inline bool Serial_IsCharReceived(void) ATTR_WARN_UNUSED_RESULT ATTR_ALWAYS_INLINE;
+ 130:../../LUFA/Drivers/Peripheral/Serial.h **** 			static inline bool Serial_IsCharReceived(void)
+ 131:../../LUFA/Drivers/Peripheral/Serial.h **** 			{
+ 132:../../LUFA/Drivers/Peripheral/Serial.h **** 				return ((UCSR1A & (1 << RXC1)) ? true : false);
+ 133:../../LUFA/Drivers/Peripheral/Serial.h **** 			}
+ 134:../../LUFA/Drivers/Peripheral/Serial.h **** 			
+ 135:../../LUFA/Drivers/Peripheral/Serial.h **** 			/** Transmits a given byte through the USART.
+ 136:../../LUFA/Drivers/Peripheral/Serial.h **** 			 *
+ 137:../../LUFA/Drivers/Peripheral/Serial.h **** 			 *  \param[in] DataByte  Byte to transmit through the USART.
+ 138:../../LUFA/Drivers/Peripheral/Serial.h **** 			 */
+ 139:../../LUFA/Drivers/Peripheral/Serial.h **** 			static inline void Serial_TxByte(const char DataByte) ATTR_ALWAYS_INLINE;
+ 140:../../LUFA/Drivers/Peripheral/Serial.h **** 			static inline void Serial_TxByte(const char DataByte)
+ 141:../../LUFA/Drivers/Peripheral/Serial.h **** 			{
+ 142:../../LUFA/Drivers/Peripheral/Serial.h **** 				while (!(UCSR1A & (1 << UDRE1)));
+ 472               		.loc 3 142 0
+ 473 0058 9091 C800 		lds r25,200
+ 474 005c 95FF      		sbrs r25,5
+ 475 005e 00C0      		rjmp .L18
+ 143:../../LUFA/Drivers/Peripheral/Serial.h **** 				UDR1 = DataByte;
+ 476               		.loc 3 143 0
+ 477 0060 8093 CE00 		sts 206,r24
+ 478               	.LVL28:
+ 479               	.L15:
+ 480 0064 A0E0      		ldi r26,lo8(keyboardData)
+ 481 0066 B0E0      		ldi r27,hi8(keyboardData)
+ 482 0068 F901      		movw r30,r18
+ 483               	.LVL29:
+ 484               	.L19:
+ 485               	.LBE112:
+ 486               	.LBE111:
+ 216:Arduino-keyboard.c **** 	}
+ 217:Arduino-keyboard.c **** 
+ 218:Arduino-keyboard.c **** 	for (ind=0; ind<8; ind++) {
+ 219:Arduino-keyboard.c **** 	    datap[ind] = keyboardData[ind];
+ 487               		.loc 1 219 0 discriminator 3
+ 488 006a 8D91      		ld r24,X+
+ 489               	.LVL30:
+ 490 006c 8193      		st Z+,r24
+ 491               	.LVL31:
+ 218:Arduino-keyboard.c **** 	    datap[ind] = keyboardData[ind];
+ 492               		.loc 1 218 0 discriminator 3
+ 493 006e 80E0      		ldi r24,hi8(keyboardData+8)
+ 494 0070 A030      		cpi r26,lo8(keyboardData+8)
+ 495 0072 B807      		cpc r27,r24
+ 496 0074 01F4      		brne .L19
+ 220:Arduino-keyboard.c **** 	}
+ 221:Arduino-keyboard.c **** 
+ 222:Arduino-keyboard.c **** 	*ReportSize = sizeof(USB_KeyboardReport_Data_t);
+ 497               		.loc 1 222 0
+ 498 0076 88E0      		ldi r24,lo8(8)
+ 499 0078 90E0      		ldi r25,0
+ 500 007a F801      		movw r30,r16
+ 501 007c 9183      		std Z+1,r25
+ 502 007e 8083      		st Z,r24
+ 223:Arduino-keyboard.c **** 	return false;
+ 224:Arduino-keyboard.c **** }
+ 503               		.loc 1 224 0
+ 504 0080 80E0      		ldi r24,0
+ 505               	/* epilogue start */
+ 506 0082 1F91      		pop r17
+ 507 0084 0F91      		pop r16
+ 508               	.LVL32:
+ 509 0086 0895      		ret
+ 510               		.cfi_endproc
+ 511               	.LFE97:
+ 513               		.section	.text.CALLBACK_HID_Device_ProcessHIDReport,"ax",@progbits
+ 514               	.global	CALLBACK_HID_Device_ProcessHIDReport
+ 516               	CALLBACK_HID_Device_ProcessHIDReport:
+ 517               	.LFB98:
+ 225:Arduino-keyboard.c **** 
+ 226:Arduino-keyboard.c **** /** HID class driver callback function for the processing of HID reports from the host.
+ 227:Arduino-keyboard.c ****  *
+ 228:Arduino-keyboard.c ****  *  \param[in] HIDInterfaceInfo  Pointer to the HID class interface configuration structure being r
+ 229:Arduino-keyboard.c ****  *  \param[in] ReportID    Report ID of the received report from the host
+ 230:Arduino-keyboard.c ****  *  \param[in] ReportType  The type of report that the host has sent, either REPORT_ITEM_TYPE_Out o
+ 231:Arduino-keyboard.c ****  *  \param[in] ReportData  Pointer to a buffer where the created report has been stored
+ 232:Arduino-keyboard.c ****  *  \param[in] ReportSize  Size in bytes of the received HID report
+ 233:Arduino-keyboard.c ****  */
+ 234:Arduino-keyboard.c **** void CALLBACK_HID_Device_ProcessHIDReport(USB_ClassInfo_HID_Device_t* const HIDInterfaceInfo,
+ 235:Arduino-keyboard.c ****                                           const uint8_t ReportID,
+ 236:Arduino-keyboard.c ****                                           const uint8_t ReportType,
+ 237:Arduino-keyboard.c ****                                           const void* ReportData,
+ 238:Arduino-keyboard.c ****                                           const uint16_t ReportSize)
+ 239:Arduino-keyboard.c **** {
+ 518               		.loc 1 239 0
+ 519               		.cfi_startproc
+ 520               	.LVL33:
+ 521               	/* prologue: function */
+ 522               	/* frame size = 0 */
+ 523               	/* stack size = 0 */
+ 524               	.L__stack_usage = 0
+ 240:Arduino-keyboard.c ****     /* Need to send status back to the Arduino to manage caps, scrolllock, numlock leds */
+ 241:Arduino-keyboard.c ****    ledReport = *((uint8_t *)ReportData);
+ 525               		.loc 1 241 0
+ 526 0000 F901      		movw r30,r18
+ 527 0002 8081      		ld r24,Z
+ 528               	.LVL34:
+ 529 0004 8093 0000 		sts ledReport,r24
+ 530 0008 0895      		ret
+ 531               		.cfi_endproc
+ 532               	.LFE98:
+ 534               		.section	.text.__vector_23,"ax",@progbits
+ 535               	.global	__vector_23
+ 537               	__vector_23:
+ 538               	.LFB99:
+ 242:Arduino-keyboard.c **** }
+ 243:Arduino-keyboard.c **** 
+ 244:Arduino-keyboard.c **** /** ISR to manage the reception of data from the serial port, placing received bytes into a circula
+ 245:Arduino-keyboard.c ****  *  for later transmission to the host.
+ 246:Arduino-keyboard.c ****  */
+ 247:Arduino-keyboard.c **** ISR(USART1_RX_vect, ISR_BLOCK)
+ 248:Arduino-keyboard.c **** {
+ 539               		.loc 1 248 0
+ 540               		.cfi_startproc
+ 541 0000 1F92      		push r1
+ 542               	.LCFI11:
+ 543               		.cfi_def_cfa_offset 3
+ 544               		.cfi_offset 1, -2
+ 545 0002 0F92      		push r0
+ 546               	.LCFI12:
+ 547               		.cfi_def_cfa_offset 4
+ 548               		.cfi_offset 0, -3
+ 549 0004 0FB6      		in r0,__SREG__
+ 550 0006 0F92      		push r0
+ 551 0008 1124      		clr __zero_reg__
+ 552 000a 2F93      		push r18
+ 553               	.LCFI13:
+ 554               		.cfi_def_cfa_offset 5
+ 555               		.cfi_offset 18, -4
+ 556 000c 8F93      		push r24
+ 557               	.LCFI14:
+ 558               		.cfi_def_cfa_offset 6
+ 559               		.cfi_offset 24, -5
+ 560 000e 9F93      		push r25
+ 561               	.LCFI15:
+ 562               		.cfi_def_cfa_offset 7
+ 563               		.cfi_offset 25, -6
+ 564 0010 EF93      		push r30
+ 565               	.LCFI16:
+ 566               		.cfi_def_cfa_offset 8
+ 567               		.cfi_offset 30, -7
+ 568 0012 FF93      		push r31
+ 569               	.LCFI17:
+ 570               		.cfi_def_cfa_offset 9
+ 571               		.cfi_offset 31, -8
+ 572               	/* prologue: Signal */
+ 573               	/* frame size = 0 */
+ 574               	/* stack size = 8 */
+ 575               	.L__stack_usage = 8
+ 249:Arduino-keyboard.c **** 	uint8_t ReceivedByte = UDR1;
+ 576               		.loc 1 249 0
+ 577 0014 8091 CE00 		lds r24,206
+ 578               	.LVL35:
+ 250:Arduino-keyboard.c **** 
+ 251:Arduino-keyboard.c **** 	if (USB_DeviceState == DEVICE_STATE_Configured)
+ 579               		.loc 1 251 0
+ 580 0018 9EB3      		in r25,0x1e
+ 581 001a 9430      		cpi r25,lo8(4)
+ 582 001c 01F4      		brne .L25
+ 583               	.LVL36:
+ 584               	.LBB120:
+ 585               	.LBB121:
+ 161:Lib/LightweightRingBuff.h **** 			
+ 586               		.loc 4 161 0
+ 587 001e E091 0000 		lds r30,USARTtoUSB_Buffer+128
+ 588 0022 F091 0000 		lds r31,USARTtoUSB_Buffer+128+1
+ 589 0026 8083      		st Z,r24
+ 163:Lib/LightweightRingBuff.h **** 			  Buffer->In = Buffer->Buffer;
+ 590               		.loc 4 163 0
+ 591 0028 E091 0000 		lds r30,USARTtoUSB_Buffer+128
+ 592 002c F091 0000 		lds r31,USARTtoUSB_Buffer+128+1
+ 593 0030 CF01      		movw r24,r30
+ 594               	.LVL37:
+ 595 0032 0196      		adiw r24,1
+ 596 0034 9093 0000 		sts USARTtoUSB_Buffer+128+1,r25
+ 597 0038 8093 0000 		sts USARTtoUSB_Buffer+128,r24
+ 598 003c 8050      		subi r24,lo8(USARTtoUSB_Buffer+128)
+ 599 003e 9040      		sbci r25,hi8(USARTtoUSB_Buffer+128)
+ 600 0040 01F4      		brne .L27
+ 164:Lib/LightweightRingBuff.h **** 
+ 601               		.loc 4 164 0
+ 602 0042 80E0      		ldi r24,lo8(USARTtoUSB_Buffer)
+ 603 0044 90E0      		ldi r25,hi8(USARTtoUSB_Buffer)
+ 604 0046 9283      		std Z+2,r25
+ 605 0048 8183      		std Z+1,r24
+ 606               	.L27:
+ 607               	.LBB122:
+ 166:Lib/LightweightRingBuff.h **** 			{
+ 608               		.loc 4 166 0
+ 609 004a 9FB7      		in r25,__SREG__
+ 610               	.LVL38:
+ 611               	.LBB123:
+ 612               	.LBB124:
+  50:/usr/lib/avr/include/util/atomic.h ****     return 1;
+ 613               		.loc 5 50 0
+ 614               	/* #APP */
+ 615               	 ;  50 "/usr/lib/avr/include/util/atomic.h" 1
+ 616 004c F894      		cli
+ 617               	 ;  0 "" 2
+ 618               	.LVL39:
+ 619               	/* #NOAPP */
+ 620               	.LBE124:
+ 621               	.LBE123:
+ 168:Lib/LightweightRingBuff.h **** 			}
+ 622               		.loc 4 168 0
+ 623 004e 8091 0000 		lds r24,USARTtoUSB_Buffer+132
+ 624 0052 8F5F      		subi r24,lo8(-(1))
+ 625 0054 8093 0000 		sts USARTtoUSB_Buffer+132,r24
+ 626               	.LVL40:
+ 627               	.LBB125:
+ 628               	.LBB126:
+  70:/usr/lib/avr/include/util/atomic.h ****     __asm__ volatile ("" ::: "memory");
+ 629               		.loc 5 70 0
+ 630 0058 9FBF      		out __SREG__,r25
+ 631               		.loc 5 71 0
+ 632               	.LVL41:
+ 633               	.L25:
+ 634               	/* epilogue start */
+ 635               	.LBE126:
+ 636               	.LBE125:
+ 637               	.LBE122:
+ 638               	.LBE121:
+ 639               	.LBE120:
+ 252:Arduino-keyboard.c **** 	  RingBuffer_Insert(&USARTtoUSB_Buffer, ReceivedByte);
+ 253:Arduino-keyboard.c **** }
+ 640               		.loc 1 253 0
+ 641 005a FF91      		pop r31
+ 642 005c EF91      		pop r30
+ 643 005e 9F91      		pop r25
+ 644 0060 8F91      		pop r24
+ 645 0062 2F91      		pop r18
+ 646 0064 0F90      		pop r0
+ 647 0066 0FBE      		out __SREG__,r0
+ 648 0068 0F90      		pop r0
+ 649 006a 1F90      		pop r1
+ 650 006c 1895      		reti
+ 651               		.cfi_endproc
+ 652               	.LFE99:
+ 654               	.global	ledReport
+ 655               		.section .bss
+ 658               	ledReport:
+ 659 0000 00        		.zero	1
+ 660               	.global	keyboardData
+ 663               	keyboardData:
+ 664 0001 0000 0000 		.zero	8
+ 664      0000 0000 
+ 665               		.comm	USARTtoUSB_Buffer,133,1
+ 666               	.global	Keyboard_HID_Interface
+ 667               		.data
+ 670               	Keyboard_HID_Interface:
+ 671 0000 00        		.byte	0
+ 672 0001 01        		.byte	1
+ 673 0002 0800      		.word	8
+ 674 0004 00        		.byte	0
+ 675 0005 0000      		.word	PrevKeyboardHIDReportBuffer
+ 676 0007 08        		.byte	8
+ 677 0008 0000 0000 		.zero	5
+ 677      00
+ 678               		.comm	PrevKeyboardHIDReportBuffer,8,1
+ 679               		.text
+ 680               	.Letext0:
+ 681               		.file 8 "/usr/lib/avr/include/stdint.h"
+ 682               		.file 9 "../../LUFA/Drivers/USB/HighLevel/../LowLevel/USBController.h"
+ 683               		.file 10 "../../LUFA/Drivers/USB/HighLevel/USBTask.h"
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 Arduino-keyboard.c
+     /tmp/ccEFpHd1.s:2      *ABS*:000000000000003e __SP_H__
+     /tmp/ccEFpHd1.s:3      *ABS*:000000000000003d __SP_L__
+     /tmp/ccEFpHd1.s:4      *ABS*:000000000000003f __SREG__
+     /tmp/ccEFpHd1.s:5      *ABS*:0000000000000000 __tmp_reg__
+     /tmp/ccEFpHd1.s:6      *ABS*:0000000000000001 __zero_reg__
+     /tmp/ccEFpHd1.s:13     .text.SetupHardware:0000000000000000 SetupHardware
+     /tmp/ccEFpHd1.s:171    .text.startup.main:0000000000000000 main
+                            *COM*:0000000000000085 USARTtoUSB_Buffer
+     /tmp/ccEFpHd1.s:670    .data:0000000000000000 Keyboard_HID_Interface
+     /tmp/ccEFpHd1.s:241    .text.EVENT_USB_Device_Connect:0000000000000000 EVENT_USB_Device_Connect
+     /tmp/ccEFpHd1.s:255    .text.EVENT_USB_Device_Disconnect:0000000000000000 EVENT_USB_Device_Disconnect
+     /tmp/ccEFpHd1.s:270    .text.EVENT_USB_Device_ConfigurationChanged:0000000000000000 EVENT_USB_Device_ConfigurationChanged
+     /tmp/ccEFpHd1.s:301    .text.EVENT_USB_Device_UnhandledControlRequest:0000000000000000 EVENT_USB_Device_UnhandledControlRequest
+     /tmp/ccEFpHd1.s:320    .text.EVENT_USB_Device_StartOfFrame:0000000000000000 EVENT_USB_Device_StartOfFrame
+     /tmp/ccEFpHd1.s:352    .text.CALLBACK_HID_Device_CreateHIDReport:0000000000000000 CALLBACK_HID_Device_CreateHIDReport
+     /tmp/ccEFpHd1.s:663    .bss:0000000000000001 keyboardData
+     /tmp/ccEFpHd1.s:658    .bss:0000000000000000 ledReport
+     /tmp/ccEFpHd1.s:516    .text.CALLBACK_HID_Device_ProcessHIDReport:0000000000000000 CALLBACK_HID_Device_ProcessHIDReport
+     /tmp/ccEFpHd1.s:537    .text.__vector_23:0000000000000000 __vector_23
+                            *COM*:0000000000000008 PrevKeyboardHIDReportBuffer
+
+UNDEFINED SYMBOLS
+USB_Init
+HID_Device_USBTask
+USB_USBTask
+HID_Device_ConfigureEndpoints
+HID_Device_ProcessControlRequest
+__do_copy_data
+__do_clear_bss

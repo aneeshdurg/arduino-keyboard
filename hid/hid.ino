@@ -3,33 +3,51 @@
  */
 #include "usb_hid_keys.h"
 
-#define KEY_LEFT_CTRL  0x01
-#define KEY_LEFT_SHIFT  0x02
-#define KEY_RIGHT_CTRL  0x10
-#define KEY_RIGHT_SHIFT 0x20
+uint8_t buf[8] = {0}; /* Keyboard report buffer */
 
-uint8_t buf[8] = {
-  0 };  /* Keyboard report buffer */
-
-void setup()
-{
+void setup() {
   Serial.begin(9600);
   delay(200);
 }
 
-void loop()
-{
-    buf[0] = KEY_LEFT_CTRL;   // Ctrl
-    buf[2] = 6;    // Letter C
+int done = 0;
+void loop() {
+  if (!done) {
+    buf[0] = KEY_MOD_LCTRL;
+    buf[2] = KEY_LEFTALT;
+    buf[3] = KEY_T;
     // buf[2] = 124;    // Copy key: Less portable
-    Serial.write(buf, 8); // Send keypress
-    releaseKey();
+    //Serial.write(buf, 8); // Send keypress
+    done = 1;
+  } else if (done == 1) {
+    char cmd[] = "echo hacked!";
+    for (int i = 0; i < sizeof(cmd) - 1; i++){
+      if (cmd[i] >= 'a' && cmd[i] <= 'z')
+        buf[2] = KEY_A + cmd[i] - 'a';
+      else if (cmd[i] == ' ')
+        buf[2] = KEY_SPACE;
+      else {
+        buf[0] = KEY_MOD_LSHIFT;
+        buf[2] = KEY_1;
+      }
+      Serial.write(buf, 8);
+      releaseKey(10);
+    }
+    buf[2] = KEY_ENTER;
+    Serial.write(buf, 8);
+    releaseKey(10);
+    done += 1;
+  }
+  releaseKey();
 }
 
-void releaseKey()
-{
+void releaseKey(int d) {
+  memset(buf, 0, sizeof(buf));
   buf[0] = 0;
   buf[2] = 0;
   Serial.write(buf, 8); // Release key
-  delay(500);
+  delay(d);
+}
+void releaseKey() {
+  releaseKey(200);
 }

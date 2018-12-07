@@ -1,5 +1,5 @@
 USBSERIAL_HEX=Arduino-COMBINED-dfu-usbserial-atmega16u2-Uno-Rev3.hex
-HID_HEX=Arduino-keyboard-0.3.hex
+HID_HEX?=Arduino-keyboard-0.3.hex
 
 PROGRAMMER=sudo dfu-programmer
 DEVICE=atmega16u2
@@ -22,7 +22,7 @@ all:
 verify:
 	$(ARDUINO_DIR)/arduino --verify hid/hid.ino $(ARDUINO_OPTS)
 
-keyboard: verify
+keyboard:
 	$(ARDUINO_DIR)/arduino --upload hid/hid.ino $(ARDUINO_OPTS)
 
 programmable:
