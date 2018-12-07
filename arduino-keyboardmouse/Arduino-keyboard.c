@@ -56,242 +56,250 @@
 /*
  * Date         Rev  Description
  * 21-Mar-2011  0.1  Initial version.
- * 23-Mar-2011  0.2  Improved handling of serial reports to ensure that all reports
- *                   will be sent.
- * 13-Apr-2011  0.3  Extended range of keys from 101 to 231.
+ * 23-Mar-2011  0.2  Improved handling of serial reports to ensure that all
+ * reports will be sent. 13-Apr-2011  0.3  Extended range of keys from 101 to
+ * 231.
  */
 
 /** \file
  *
- *  Main source file for the Arduino-keyboard project. This file contains the main tasks of
- *  the project and is responsible for the initial application hardware configuration.
+ *  Main source file for the Arduino-keyboard project. This file contains the
+ * main tasks of the project and is responsible for the initial application
+ * hardware configuration.
  */
 
 #include "Arduino-keyboard.h"
 
-/** Buffer to hold the previously generated Keyboard HID report, for comparison purposes inside the HID class driver. */
+/** Buffer to hold the previously generated Keyboard HID report, for comparison
+ * purposes inside the HID class driver. */
 uint8_t PrevKeyboardHIDReportBuffer[sizeof(USB_KeyboardReport_Data_t)];
 uint8_t PrevMouseHIDReportBuffer[sizeof(USB_MouseReport_Data_t)];
 
-/** LUFA HID Class driver interface configuration and state information. This structure is
- *  passed to all HID Class driver functions, so that multiple instances of the same class
- *  within a device can be differentiated from one another.
+/** LUFA HID Class driver interface configuration and state information. This
+ * structure is passed to all HID Class driver functions, so that multiple
+ * instances of the same class within a device can be differentiated from one
+ * another.
  */
-USB_ClassInfo_HID_Device_t Keyboard_HID_Interface =
- 	{
-		.Config =
-			{
-				.InterfaceNumber              = 0,
+USB_ClassInfo_HID_Device_t Keyboard_HID_Interface = {
+    .Config =
+        {
+            .InterfaceNumber = 0,
 
-				.ReportINEndpointNumber       = KEYBOARD_EPNUM,
-				.ReportINEndpointSize         = HID_EPSIZE,
-				.ReportINEndpointDoubleBank   = false,
+            .ReportINEndpointNumber = KEYBOARD_EPNUM,
+            .ReportINEndpointSize = HID_EPSIZE,
+            .ReportINEndpointDoubleBank = false,
 
-				.PrevReportINBuffer           = PrevKeyboardHIDReportBuffer,
-				.PrevReportINBufferSize       = sizeof(PrevKeyboardHIDReportBuffer),
-			},
-    };
+            .PrevReportINBuffer = PrevKeyboardHIDReportBuffer,
+            .PrevReportINBufferSize = sizeof(PrevKeyboardHIDReportBuffer),
+        },
+};
 
-/** LUFA HID Class driver interface configuration and state information. This structure is
- *  passed to all HID Class driver functions, so that multiple instances of the same class
- *  within a device can be differentiated from one another. This is for the mouse HID
- *  interface within the device.
+/** LUFA HID Class driver interface configuration and state information. This
+ * structure is passed to all HID Class driver functions, so that multiple
+ * instances of the same class within a device can be differentiated from one
+ * another. This is for the mouse HID interface within the device.
  */
-USB_ClassInfo_HID_Device_t Mouse_HID_Interface =
-	{
-		.Config =
-			{
-				.InterfaceNumber              = 1,
+USB_ClassInfo_HID_Device_t Mouse_HID_Interface = {
+    .Config =
+        {
+            .InterfaceNumber = 1,
 
-				.ReportINEndpointNumber       = MOUSE_IN_EPNUM,
-				.ReportINEndpointSize         = HID_EPSIZE,
+            .ReportINEndpointNumber = MOUSE_IN_EPNUM,
+            .ReportINEndpointSize = HID_EPSIZE,
 
-				.PrevReportINBuffer           = PrevMouseHIDReportBuffer,
-				.PrevReportINBufferSize       = sizeof(PrevMouseHIDReportBuffer),
-			},
-	};
+            .PrevReportINBuffer = PrevMouseHIDReportBuffer,
+            .PrevReportINBufferSize = sizeof(PrevMouseHIDReportBuffer),
+        },
+};
 
-/** Main program entry point. This routine contains the overall program flow, including initial
- *  setup of all components and the main program loop.
+/** Main program entry point. This routine contains the overall program flow,
+ * including initial setup of all components and the main program loop.
  */
 
-/** Circular buffer to hold data from the serial port before it is sent to the host. */
+/** Circular buffer to hold data from the serial port before it is sent to the
+ * host. */
 RingBuff_t USARTtoUSB_Buffer_keyboard;
 RingBuff_t USARTtoUSB_Buffer_mouse;
 
-uint8_t keyboardData[8] = { 0 };
+uint8_t keyboardData[8] = {0};
+uint8_t mouseData[4] = {0};
 uint8_t ledReport = 0;
 
-/** Main program entry point. This routine contains the overall program flow, including initial
- *  setup of all components and the main program loop.
+/** Main program entry point. This routine contains the overall program flow,
+ * including initial setup of all components and the main program loop.
  */
-int main(void)
-{
-	SetupHardware();
+int main(void) {
+  SetupHardware();
 
-	RingBuffer_InitBuffer(&USARTtoUSB_Buffer_keyboard);
+  RingBuffer_InitBuffer(&USARTtoUSB_Buffer_keyboard);
 
-	sei();
+  sei();
 
-	for (;;)
-	{
-		HID_Device_USBTask(&Keyboard_HID_Interface);
-		HID_Device_USBTask(&Mouse_HID_Interface);
-		USB_USBTask();
-	}
+  for (;;) {
+    HID_Device_USBTask(&Keyboard_HID_Interface);
+    HID_Device_USBTask(&Mouse_HID_Interface);
+    USB_USBTask();
+  }
 }
 
-/** Configures the board hardware and chip peripherals for the demo's functionality. */
-void SetupHardware(void)
-{
-	/* Disable watchdog if enabled by bootloader/fuses */
-	MCUSR &= ~(1 << WDRF);
-	wdt_disable();
+/** Configures the board hardware and chip peripherals for the demo's
+ * functionality. */
+void SetupHardware(void) {
+  /* Disable watchdog if enabled by bootloader/fuses */
+  MCUSR &= ~(1 << WDRF);
+  wdt_disable();
 
-	/* Hardware Initialization */
-	Serial_Init(9600, false);
-	USB_Init();
+  /* Hardware Initialization */
+  Serial_Init(9600, false);
+  USB_Init();
 
-	/* Start the flush timer so that overflows occur rapidly to push received bytes to the USB interface */
-	TCCR0B = (1 << CS02);
+  /* Start the flush timer so that overflows occur rapidly to push received
+   * bytes to the USB interface */
+  TCCR0B = (1 << CS02);
 
-	/* Pull target /RESET line high */
-	AVR_RESET_LINE_PORT |= AVR_RESET_LINE_MASK;
-	AVR_RESET_LINE_DDR  |= AVR_RESET_LINE_MASK;
+  /* Pull target /RESET line high */
+  AVR_RESET_LINE_PORT |= AVR_RESET_LINE_MASK;
+  AVR_RESET_LINE_DDR |= AVR_RESET_LINE_MASK;
 
-	/* Must turn off USART before reconfiguring it, otherwise incorrect operation may occur */
-	UCSR1B = 0;
-	UCSR1A = 0;
-	UCSR1C = 0;
+  /* Must turn off USART before reconfiguring it, otherwise incorrect operation
+   * may occur */
+  UCSR1B = 0;
+  UCSR1A = 0;
+  UCSR1C = 0;
 
-	/* Special case 57600 baud for compatibility with the ATmega328 bootloader. */
-	UBRR1  = SERIAL_2X_UBBRVAL(9600);
+  /* Special case 57600 baud for compatibility with the ATmega328 bootloader. */
+  UBRR1 = SERIAL_2X_UBBRVAL(9600);
 
-	UCSR1C = ((1 << UCSZ11) | (1 << UCSZ10));
-	UCSR1A = (1 << U2X1);
-	UCSR1B = ((1 << RXCIE1) | (1 << TXEN1) | (1 << RXEN1));
+  UCSR1C = ((1 << UCSZ11) | (1 << UCSZ10));
+  UCSR1A = (1 << U2X1);
+  UCSR1B = ((1 << RXCIE1) | (1 << TXEN1) | (1 << RXEN1));
 }
 
 /** Event handler for the library USB Connection event. */
-void EVENT_USB_Device_Connect(void)
-{
-	//LEDs_SetAllLEDs(LEDMASK_USB_ENUMERATING);
+void EVENT_USB_Device_Connect(void) {
+  // LEDs_SetAllLEDs(LEDMASK_USB_ENUMERATING);
 }
 
 /** Event handler for the library USB Disconnection event. */
-void EVENT_USB_Device_Disconnect(void)
-{
-	//LEDs_SetAllLEDs(LEDMASK_USB_NOTREADY);
+void EVENT_USB_Device_Disconnect(void) {
+  // LEDs_SetAllLEDs(LEDMASK_USB_NOTREADY);
 }
 
 /** Event handler for the library USB Configuration Changed event. */
-void EVENT_USB_Device_ConfigurationChanged(void)
-{
-	//LEDs_SetAllLEDs(LEDMASK_USB_READY);
+void EVENT_USB_Device_ConfigurationChanged(void) {
+  // LEDs_SetAllLEDs(LEDMASK_USB_READY);
 
-	HID_Device_ConfigureEndpoints(&Keyboard_HID_Interface);
-	HID_Device_ConfigureEndpoints(&Mouse_HID_Interface);
+  HID_Device_ConfigureEndpoints(&Keyboard_HID_Interface);
+  HID_Device_ConfigureEndpoints(&Mouse_HID_Interface);
 
-	USB_Device_EnableSOFEvents();
+  USB_Device_EnableSOFEvents();
 }
 
 /** Event handler for the library USB Unhandled Control Request event. */
-void EVENT_USB_Device_UnhandledControlRequest(void)
-{
-	HID_Device_ProcessControlRequest(&Keyboard_HID_Interface);
-	HID_Device_ProcessControlRequest(&Mouse_HID_Interface);
+void EVENT_USB_Device_UnhandledControlRequest(void) {
+  HID_Device_ProcessControlRequest(&Keyboard_HID_Interface);
+  HID_Device_ProcessControlRequest(&Mouse_HID_Interface);
 }
 
 /** Event handler for the USB device Start Of Frame event. */
-void EVENT_USB_Device_StartOfFrame(void)
-{
-	HID_Device_MillisecondElapsed(&Keyboard_HID_Interface);
-	HID_Device_MillisecondElapsed(&Mouse_HID_Interface);
+void EVENT_USB_Device_StartOfFrame(void) {
+  HID_Device_MillisecondElapsed(&Keyboard_HID_Interface);
+  HID_Device_MillisecondElapsed(&Mouse_HID_Interface);
 }
 
-/** HID class driver callback function for the creation of HID reports to the host.
+/** HID class driver callback function for the creation of HID reports to the
+ * host.
  *
- *  \param[in]     HIDInterfaceInfo  Pointer to the HID class interface configuration structure being referenced
- *  \param[in,out] ReportID    Report ID requested by the host if non-zero, otherwise callback should set to the generated report ID
- *  \param[in]     ReportType  Type of the report to create, either REPORT_ITEM_TYPE_In or REPORT_ITEM_TYPE_Feature
- *  \param[out]    ReportData  Pointer to a buffer where the created report should be stored
- *  \param[out]    ReportSize  Number of bytes written in the report (or zero if no report is to be sent
+ *  \param[in]     HIDInterfaceInfo  Pointer to the HID class interface
+ * configuration structure being referenced \param[in,out] ReportID    Report ID
+ * requested by the host if non-zero, otherwise callback should set to the
+ * generated report ID \param[in]     ReportType  Type of the report to create,
+ * either REPORT_ITEM_TYPE_In or REPORT_ITEM_TYPE_Feature \param[out] ReportData
+ * Pointer to a buffer where the created report should be stored \param[out]
+ * ReportSize  Number of bytes written in the report (or zero if no report is to
+ * be sent
  *
- *  \return Boolean true to force the sending of the report, false to let the library determine if it needs to be sent
+ *  \return Boolean true to force the sending of the report, false to let the
+ * library determine if it needs to be sent
  */
 bool CALLBACK_HID_Device_CreateHIDReport(
-    USB_ClassInfo_HID_Device_t* const HIDInterfaceInfo,
-    uint8_t* const ReportID,
-    const uint8_t ReportType,
-    void* ReportData,
-    uint16_t* const ReportSize)
-{
-	uint8_t *datap = ReportData;
+    USB_ClassInfo_HID_Device_t *const HIDInterfaceInfo, uint8_t *const ReportID,
+    const uint8_t ReportType, void *ReportData, uint16_t *const ReportSize) {
+  uint8_t *datap = ReportData;
 
   if (HIDInterfaceInfo == &Keyboard_HID_Interface) {
-	  int ind;
+    int ind;
 
-	  RingBuff_Count_t BufferCount = RingBuffer_GetCount(&USARTtoUSB_Buffer_keyboard);
+    RingBuff_Count_t BufferCount =
+        RingBuffer_GetCount(&USARTtoUSB_Buffer_keyboard);
 
-	  if (BufferCount >= 8) {
-	      for (ind=0; ind<8; ind++) {
-	  	keyboardData[ind] = RingBuffer_Remove(&USARTtoUSB_Buffer_keyboard);
-	      }
+    if (BufferCount >= 8) {
+      for (ind = 0; ind < 8; ind++) {
+        keyboardData[ind] = RingBuffer_Remove(&USARTtoUSB_Buffer_keyboard);
+      }
 
-	      /* Send an led status byte back for every keyboard report received */
-	      Serial_TxByte(ledReport);
-	  }
+      /* Send an led status byte back for every keyboard report received */
+      Serial_TxByte(ledReport);
+    }
 
-	  for (ind=0; ind<8; ind++) {
-	      datap[ind] = keyboardData[ind];
-	  }
+    for (ind = 0; ind < 8; ind++) {
+      datap[ind] = keyboardData[ind];
+    }
   } else {
+    int ind;
     // TODO mouse callback
-	    RingBuff_Count_t BufferCount = RingBuffer_GetCount(&USARTtoUSB_Buffer);
+    RingBuff_Count_t BufferCount =
+        RingBuffer_GetCount(&USARTtoUSB_Buffer_mouse);
 
-	    if (BufferCount >= 4) {
-		for (ind=0; ind<3; ind++) {
-		    ((uint8_t *)&newReport)[ind] = RingBuffer_Remove(&USARTtoUSB_Buffer);
-		}
-
-		RingBuffer_Remove(&USARTtoUSB_Buffer);	// unused wheel for now
-
-		mouseReport.Button = newReport.Button;
-		mouseReport.X = newReport.X;
-		mouseReport.Y = newReport.Y;
-	    }
+    if (BufferCount >= 4) {
+      for (ind = 0; ind < 4; ind++)
+        mouseData[ind] = RingBuffer_Remove(&USARTtoUSB_Buffer_mouse);
+    }
+    for (ind = 0; ind < 4; ind++)
+      datap[ind] = mouseData[ind];
   }
 
-	*ReportSize = sizeof(USB_KeyboardReport_Data_t);
-	return false;
+  *ReportSize = sizeof(USB_MouseReport_Data_t);
+  return false;
 }
 
-/** HID class driver callback function for the processing of HID reports from the host.
+/** HID class driver callback function for the processing of HID reports from
+ * the host.
  *
- *  \param[in] HIDInterfaceInfo  Pointer to the HID class interface configuration structure being referenced
- *  \param[in] ReportID    Report ID of the received report from the host
- *  \param[in] ReportType  The type of report that the host has sent, either REPORT_ITEM_TYPE_Out or REPORT_ITEM_TYPE_Feature
- *  \param[in] ReportData  Pointer to a buffer where the created report has been stored
- *  \param[in] ReportSize  Size in bytes of the received HID report
+ *  \param[in] HIDInterfaceInfo  Pointer to the HID class interface
+ * configuration structure being referenced \param[in] ReportID    Report ID of
+ * the received report from the host \param[in] ReportType  The type of report
+ * that the host has sent, either REPORT_ITEM_TYPE_Out or
+ * REPORT_ITEM_TYPE_Feature \param[in] ReportData  Pointer to a buffer where the
+ * created report has been stored \param[in] ReportSize  Size in bytes of the
+ * received HID report
  */
-void CALLBACK_HID_Device_ProcessHIDReport(USB_ClassInfo_HID_Device_t* const HIDInterfaceInfo,
-                                          const uint8_t ReportID,
-                                          const uint8_t ReportType,
-                                          const void* ReportData,
-                                          const uint16_t ReportSize)
-{
-    /* Need to send status back to the Arduino to manage caps, scrolllock, numlock leds */
-   ledReport = *((uint8_t *)ReportData);
+void CALLBACK_HID_Device_ProcessHIDReport(
+    USB_ClassInfo_HID_Device_t *const HIDInterfaceInfo, const uint8_t ReportID,
+    const uint8_t ReportType, const void *ReportData,
+    const uint16_t ReportSize) {
+  /* Need to send status back to the Arduino to manage caps, scrolllock, numlock
+   * leds */
+  ledReport = *((uint8_t *)ReportData);
 }
 
-/** ISR to manage the reception of data from the serial port, placing received bytes into a circular buffer
- *  for later transmission to the host.
+/** ISR to manage the reception of data from the serial port, placing received
+ * bytes into a circular buffer for later transmission to the host.
  */
-ISR(USART1_RX_vect, ISR_BLOCK)
-{
-  // TODO track state for keyboard vs mouse
-	uint8_t ReceivedByte = UDR1;
+ISR(USART1_RX_vect, ISR_BLOCK) {
+  static uint8_t state = 0;
+  uint8_t ReceivedByte = UDR1;
 
-	if (USB_DeviceState == DEVICE_STATE_Configured)
-	  RingBuffer_Insert(&USARTtoUSB_Buffer_keyboard, ReceivedByte);
+  // state tracks whether we're getting keyboard or mouse input
+  // The first 4 bytes are mouse and the following 8 are keyboard, so we need
+  // state to track 12 values.
+  state = 5;
+  if (USB_DeviceState == DEVICE_STATE_Configured) {
+    if(state < 4)
+      RingBuffer_Insert(&USARTtoUSB_Buffer_mouse, ReceivedByte);
+    else
+      RingBuffer_Insert(&USARTtoUSB_Buffer_keyboard, ReceivedByte);
+  }
+  state += 1;
+  state %= 12;
 }

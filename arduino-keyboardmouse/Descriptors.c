@@ -79,7 +79,7 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM KeyboardReport[] =
 	0xc0                 /* End Collection                                  */
 };
 
-USB_Descriptor_HIDReport_Datatype_t PROGMEM MouseReport[] =
+const USB_Descriptor_HIDReport_Datatype_t PROGMEM MouseReport[] =
 {
 	0x05, 0x01,          /* Usage Page (Generic Desktop)                    */
 	0x09, 0x02,          /* Usage (Mouse)                                   */
@@ -158,7 +158,7 @@ const USB_Descriptor_Configuration_t PROGMEM ConfigurationDescriptor =
 			.MaxPowerConsumption    = USB_CONFIG_POWER_MA(100)
 		},
 
-	.HID_Interface =
+	.HID1_KeyboardInterface =
 		{
 			.Header                 = {.Size = sizeof(USB_Descriptor_Interface_t), .Type = DTYPE_Interface},
 
@@ -253,7 +253,7 @@ const USB_Descriptor_String_t PROGMEM ManufacturerString =
 {
 	.Header                 = {.Size = USB_STRING_LEN(7), .Type = DTYPE_String},
 
-	.UnicodeString          = L"Arduino"
+	.UnicodeString          = L"AneeshD"
 };
 
 /** Product descriptor string. This is a Unicode string containing the product's details in human readable form,
@@ -314,7 +314,7 @@ uint16_t CALLBACK_USB_GetDescriptor(const uint16_t wValue, const uint8_t wIndex,
 			  Address = (void*)&ConfigurationDescriptor.HID1_KeyboardHID;
 			  Size    = sizeof(USB_HID_Descriptor_t);
       } else {
-			  Address = (void*)&ConfigurationDescriptor.HID2_KeyboardHID;
+			  Address = (void*)&ConfigurationDescriptor.HID2_MouseHID;
 			  Size    = sizeof(USB_HID_Descriptor_t);
       }
 			break;
