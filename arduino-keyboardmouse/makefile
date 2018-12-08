@@ -113,7 +113,7 @@ FORMAT = ihex
 
 
 # Target file name (without extension).
-TARGET = Arduino-keyboard
+TARGET = arduino-keyboardmouse
 
 
 # Object files directory

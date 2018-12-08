@@ -1,53 +1,76 @@
-/* Arduino USB Keyboard HID demo
- * Cut/Copy/Paste Keys
- */
-#include "usb_hid_keys.h"
+/* Arduino USB Mouse HID demo */
 
-uint8_t buf[8] = {0}; /* Keyboard report buffer */
+/* Author: Darran Hunt
+ * Release into the public domain.
+ */
+
+struct {
+  uint8_t buttons;
+  int8_t x;
+  int8_t y;
+  int8_t wheel; /* Not yet implemented */
+} mouseReport;
+
+uint8_t nullReport[4] = {0, 0, 0, 0};
+uint8_t k_buf[8] = {0}; /* Keyboard report buffer */
+
+void setup();
+void loop();
 
 void setup() {
   Serial.begin(9600);
   delay(200);
 }
 
-int done = 0;
+/* Move the mouse in a clockwise square every 5 seconds */
 void loop() {
-  if (!done) {
-    buf[0] = KEY_MOD_LCTRL;
-    buf[2] = KEY_LEFTALT;
-    buf[3] = KEY_T;
-    // buf[2] = 124;    // Copy key: Less portable
-    //Serial.write(buf, 8); // Send keypress
-    done = 1;
-  } else if (done == 1) {
-    char cmd[] = "echo hacked!";
-    for (int i = 0; i < sizeof(cmd) - 1; i++){
-      if (cmd[i] >= 'a' && cmd[i] <= 'z')
-        buf[2] = KEY_A + cmd[i] - 'a';
-      else if (cmd[i] == ' ')
-        buf[2] = KEY_SPACE;
-      else {
-        buf[0] = KEY_MOD_LSHIFT;
-        buf[2] = KEY_1;
-      }
-      Serial.write(buf, 8);
-      releaseKey(10);
-    }
-    buf[2] = KEY_ENTER;
-    Serial.write(buf, 8);
-    releaseKey(10);
-    done += 1;
-  }
-  releaseKey();
-}
+  int ind;
+  delay(1000);
 
-void releaseKey(int d) {
-  memset(buf, 0, sizeof(buf));
-  buf[0] = 0;
-  buf[2] = 0;
-  Serial.write(buf, 8); // Release key
-  delay(d);
-}
-void releaseKey() {
-  releaseKey(200);
+  mouseReport.buttons = 0;
+  mouseReport.x = 0;
+  mouseReport.y = 0;
+  mouseReport.wheel = 0;
+
+  mouseReport.x = -2;
+  for (ind = 0; ind < 20; ind++) {
+    Serial.write((uint8_t *)&mouseReport, 4);
+    Serial.write(k_buf, 8);
+    Serial.write((uint8_t *)&nullReport, 4);
+    Serial.write(k_buf, 8);
+  }
+
+  mouseReport.x = 0;
+  mouseReport.y = -2;
+  for (ind = 0; ind < 20; ind++) {
+    Serial.write((uint8_t *)&mouseReport, 4);
+    Serial.write(k_buf, 8);
+    Serial.write((uint8_t *)&nullReport, 4);
+    Serial.write(k_buf, 8);
+  }
+
+  mouseReport.x = 2;
+  mouseReport.y = 0;
+  for (ind = 0; ind < 20; ind++) {
+    Serial.write((uint8_t *)&mouseReport, 4);
+    Serial.write(k_buf, 8);
+    Serial.write((uint8_t *)&nullReport, 4);
+    Serial.write(k_buf, 8);
+  }
+
+  mouseReport.x = 0;
+  mouseReport.y = 2;
+  for (ind = 0; ind < 20; ind++) {
+    Serial.write((uint8_t *)&mouseReport, 4);
+    Serial.write(k_buf, 8);
+    Serial.write((uint8_t *)&nullReport, 4);
+    Serial.write(k_buf, 8);
+  }
+
+  k_buf[2] = 4;
+  Serial.write((uint8_t *)&nullReport, 4);
+  Serial.write(k_buf, 8);
+  k_buf[2] = 0;
+  Serial.write((uint8_t *)&nullReport, 4);
+  Serial.write(k_buf, 8);
 }

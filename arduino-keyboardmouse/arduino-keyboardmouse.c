@@ -29,7 +29,7 @@
 */
 
 /*-
- * Copyright (c) 2011 Darran Hunt (darran [at] hunt dot net dot nz)
+ * Copyright (c) 2018 Aneesh Durg (durg2@illinois.edu)
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -54,12 +54,11 @@
  */
 
 /*
- * Date         Rev  Description
- * 21-Mar-2011  0.1  Initial version.
- * 23-Mar-2011  0.2  Improved handling of serial reports to ensure that all
- * reports will be sent. 13-Apr-2011  0.3  Extended range of keys from 101 to
- * 231.
+ * This is an extension of Darran's keyboard driver to implement a
+ * keyboard/mouse combo.
  */
+
+
 
 /** \file
  *
@@ -68,7 +67,7 @@
  * hardware configuration.
  */
 
-#include "Arduino-keyboard.h"
+#include "arduino-keyboardmouse.h"
 
 /** Buffer to hold the previously generated Keyboard HID report, for comparison
  * purposes inside the HID class driver. */
@@ -132,6 +131,7 @@ int main(void) {
   SetupHardware();
 
   RingBuffer_InitBuffer(&USARTtoUSB_Buffer_keyboard);
+  RingBuffer_InitBuffer(&USARTtoUSB_Buffer_mouse);
 
   sei();
 
@@ -245,7 +245,10 @@ bool CALLBACK_HID_Device_CreateHIDReport(
     for (ind = 0; ind < 8; ind++) {
       datap[ind] = keyboardData[ind];
     }
-  } else {
+
+    *ReportSize = sizeof(USB_KeyboardReport_Data_t);
+    return false;
+  } else if (HIDInterfaceInfo == &Mouse_HID_Interface) {
     int ind;
     // TODO mouse callback
     RingBuff_Count_t BufferCount =
@@ -255,11 +258,14 @@ bool CALLBACK_HID_Device_CreateHIDReport(
       for (ind = 0; ind < 4; ind++)
         mouseData[ind] = RingBuffer_Remove(&USARTtoUSB_Buffer_mouse);
     }
+
     for (ind = 0; ind < 4; ind++)
       datap[ind] = mouseData[ind];
+
+    *ReportSize = sizeof(USB_MouseReport_Data_t);
+    return true;
   }
 
-  *ReportSize = sizeof(USB_MouseReport_Data_t);
   return false;
 }
 
@@ -293,13 +299,13 @@ ISR(USART1_RX_vect, ISR_BLOCK) {
   // state tracks whether we're getting keyboard or mouse input
   // The first 4 bytes are mouse and the following 8 are keyboard, so we need
   // state to track 12 values.
-  state = 5;
   if (USB_DeviceState == DEVICE_STATE_Configured) {
-    if(state < 4)
+    if(state < 4) {
       RingBuffer_Insert(&USARTtoUSB_Buffer_mouse, ReceivedByte);
-    else
+    } else {
       RingBuffer_Insert(&USARTtoUSB_Buffer_keyboard, ReceivedByte);
+    }
+    state += 1;
+    state %= 12;
   }
-  state += 1;
-  state %= 12;
 }
