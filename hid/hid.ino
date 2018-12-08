@@ -1,17 +1,6 @@
-/* Arduino USB Mouse HID demo */
+#include "usb_hid_keys/usb_hid_keys.h"
+#include "hid_km.h"
 
-/* Author: Darran Hunt
- * Release into the public domain.
- */
-
-struct {
-  uint8_t buttons;
-  int8_t x;
-  int8_t y;
-  int8_t wheel; /* Not yet implemented */
-} mouseReport;
-
-uint8_t nullReport[4] = {0, 0, 0, 0};
 uint8_t k_buf[8] = {0}; /* Keyboard report buffer */
 
 void setup();
