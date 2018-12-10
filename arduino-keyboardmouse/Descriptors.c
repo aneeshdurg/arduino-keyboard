@@ -94,7 +94,7 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM MouseReport[] =
 	0x15, 0x00,          /*     Logical Minimum (0)                         */
 	0x25, 0x01,          /*     Logical Maximum (1)                         */
 	0x81, 0x02,          /*     Input (Data, Variable, Absolute)            */
-	0x95, 0x01,          /*     Report Count (1)                            */
+	0x95, 0x01,          /*     report count (1)                            */
 	0x75, 0x05,          /*     Report Size (5)                             */
 	0x81, 0x01,          /*     Input (Constant)                            */
 	0x75, 0x08,          /*     Report Size (8)                             */
@@ -105,6 +105,12 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM MouseReport[] =
 	0x15, 0x81,          /*     Logical Minimum (-127)                      */
 	0x25, 0x7F,          /*     Logical Maximum (127)                       */
 	0x81, 0x06,          /*     Input (Data, Variable, Relative)            */
+  0x75, 0x08,          /* +   Report Size (8) */
+	0x95, 0x01,          /*     Report Count (1)                            */
+  0x09, 0x38,          /* +   AB usage wheel*/
+  0x15, 0x81,          /* +   Logical Minimum (-127) */
+  0x25, 0x7F,          /* +   Logical Maximum (127) */
+	0x81, 0x06,          /* +   Input (Data, Variable, Relative)            */
 	0xC0,                /*   End Collection                                */
 	0xC0,                /* End Collection                                  */
 };

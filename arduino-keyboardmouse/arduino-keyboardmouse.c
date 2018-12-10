@@ -117,8 +117,7 @@ USB_ClassInfo_HID_Device_t Mouse_HID_Interface = {
 
 /** Circular buffer to hold data from the serial port before it is sent to the
  * host. */
-RingBuff_t USARTtoUSB_Buffer_keyboard;
-RingBuff_t USARTtoUSB_Buffer_mouse;
+RingBuff_t USARTtoUSB_Buffer;
 
 uint8_t keyboardData[8] = {0};
 uint8_t mouseData[4] = {0};
@@ -130,8 +129,7 @@ uint8_t ledReport = 0;
 int main(void) {
   SetupHardware();
 
-  RingBuffer_InitBuffer(&USARTtoUSB_Buffer_keyboard);
-  RingBuffer_InitBuffer(&USARTtoUSB_Buffer_mouse);
+  RingBuffer_InitBuffer(&USARTtoUSB_Buffer);
 
   sei();
 
@@ -222,43 +220,56 @@ void EVENT_USB_Device_StartOfFrame(void) {
  *  \return Boolean true to force the sending of the report, false to let the
  * library determine if it needs to be sent
  */
+#define NO_EVENT 8
+#define KEY_EVENT 0
+#define MOUSE_EVENT 1
+#define KEY_NULL 2
+#define MOUSE_NULL 3
+uint8_t unprocessed_event = NO_EVENT;
+
 bool CALLBACK_HID_Device_CreateHIDReport(
     USB_ClassInfo_HID_Device_t *const HIDInterfaceInfo, uint8_t *const ReportID,
     const uint8_t ReportType, void *ReportData, uint16_t *const ReportSize) {
+  int ind;
   uint8_t *datap = ReportData;
+  RingBuff_Count_t BufferCount = RingBuffer_GetCount(&USARTtoUSB_Buffer);
 
-  if (HIDInterfaceInfo == &Keyboard_HID_Interface) {
-    int ind;
-
-    RingBuff_Count_t BufferCount =
-        RingBuffer_GetCount(&USARTtoUSB_Buffer_keyboard);
-
-    if (BufferCount >= 8) {
+  if (unprocessed_event == NO_EVENT && BufferCount >= 1) {
+    unprocessed_event = RingBuffer_Remove(&USARTtoUSB_Buffer);
+    BufferCount = RingBuffer_GetCount(&USARTtoUSB_Buffer);
+  }
+  if (unprocessed_event != NO_EVENT) {
+    if (unprocessed_event == KEY_NULL) {
+      memset(keyboardData, 0, sizeof(keyboardData));
+			unprocessed_event = NO_EVENT;
+    } else if (unprocessed_event == MOUSE_NULL) {
+      memset(mouseData, 0, sizeof(mouseData));
+			unprocessed_event = NO_EVENT;
+    } else if (unprocessed_event == KEY_EVENT && BufferCount >= 8) {
       for (ind = 0; ind < 8; ind++) {
-        keyboardData[ind] = RingBuffer_Remove(&USARTtoUSB_Buffer_keyboard);
+        keyboardData[ind] = RingBuffer_Remove(&USARTtoUSB_Buffer);
       }
 
       /* Send an led status byte back for every keyboard report received */
       Serial_TxByte(ledReport);
+			unprocessed_event = NO_EVENT;
+    } else if (unprocessed_event == MOUSE_EVENT && BufferCount >= 4) {
+      for (ind = 0; ind < 4; ind++)
+        mouseData[ind] = RingBuffer_Remove(&USARTtoUSB_Buffer);
+      /* Send an led status byte back for every mouse report received */
+      Serial_TxByte(ledReport);
+			unprocessed_event = NO_EVENT;
     }
+  }
 
-    for (ind = 0; ind < 8; ind++) {
+  if (HIDInterfaceInfo == &Keyboard_HID_Interface) {
+    for (ind = 0; ind < 8; ind++)
       datap[ind] = keyboardData[ind];
-    }
 
     *ReportSize = sizeof(USB_KeyboardReport_Data_t);
     return false;
+
   } else if (HIDInterfaceInfo == &Mouse_HID_Interface) {
-    int ind;
-    // TODO mouse callback
-    RingBuff_Count_t BufferCount =
-        RingBuffer_GetCount(&USARTtoUSB_Buffer_mouse);
-
-    if (BufferCount >= 4) {
-      for (ind = 0; ind < 4; ind++)
-        mouseData[ind] = RingBuffer_Remove(&USARTtoUSB_Buffer_mouse);
-    }
-
     for (ind = 0; ind < 4; ind++)
       datap[ind] = mouseData[ind];
 
@@ -293,19 +304,9 @@ void CALLBACK_HID_Device_ProcessHIDReport(
  * bytes into a circular buffer for later transmission to the host.
  */
 ISR(USART1_RX_vect, ISR_BLOCK) {
-  static uint8_t state = 0;
   uint8_t ReceivedByte = UDR1;
 
-  // state tracks whether we're getting keyboard or mouse input
-  // The first 4 bytes are mouse and the following 8 are keyboard, so we need
-  // state to track 12 values.
   if (USB_DeviceState == DEVICE_STATE_Configured) {
-    if(state < 4) {
-      RingBuffer_Insert(&USARTtoUSB_Buffer_mouse, ReceivedByte);
-    } else {
-      RingBuffer_Insert(&USARTtoUSB_Buffer_keyboard, ReceivedByte);
-    }
-    state += 1;
-    state %= 12;
+    RingBuffer_Insert(&USARTtoUSB_Buffer, ReceivedByte);
   }
 }

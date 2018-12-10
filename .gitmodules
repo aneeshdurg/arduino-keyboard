@@ -1,3 +1,9 @@
-[submodule "hid/usb_hid_keys"]
-	path = hid/usb_hid_keys
+[submodule "libraries/usb_hid_keys"]
+	path = libraries/usb_hid_keys
 	url = https://gist.github.com/MightyPork/6da26e382a7ad91b5496ee55fdc73db2/
+[submodule "libraries/Adafruit_MMA8451_Library"]
+	path = libraries/Adafruit_MMA8451_Library
+	url = https://github.com/adafruit/Adafruit_MMA8451_Library
+[submodule "libraries/Adafruit_Sensor"]
+	path = libraries/Adafruit_Sensor
+	url = https://github.com/adafruit/Adafruit_Sensor/
